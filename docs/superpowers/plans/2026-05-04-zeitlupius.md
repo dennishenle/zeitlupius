@@ -1448,7 +1448,7 @@ impl FsStore {
         Ok(())
     }
 
-    fn load_locked(&self, name: &ProjectName) -> Result<Project> {
+    fn load_inner(&self, name: &ProjectName) -> Result<Project> {
         let path = self.project_path(name);
         if !path.exists() {
             return Err(Error::ProjectNotFound(name.to_string()));
@@ -1457,7 +1457,7 @@ impl FsStore {
         read_project(name, bytes.as_slice())
     }
 
-    fn save_locked(&self, project: &Project) -> Result<()> {
+    fn save_inner(&self, project: &Project) -> Result<()> {
         let mut buf = Vec::new();
         write_project(project, &mut buf)?;
         self.atomic_write(&self.project_path(&project.name), &buf)
@@ -1485,7 +1485,8 @@ impl ProjectStore for FsStore {
     }
 
     fn load(&self, name: &ProjectName) -> Result<Project> {
-        self.with_lock(|| self.load_locked(name))
+        self.ensure_dirs()?;
+        self.load_inner(name)
     }
 
     fn create(&self, name: &ProjectName) -> Result<()> {
@@ -1494,7 +1495,7 @@ impl ProjectStore for FsStore {
             if path.exists() {
                 return Err(Error::ProjectAlreadyExists(name.to_string()));
             }
-            self.save_locked(&Project { name: name.clone(), sessions: vec![] })
+            self.save_inner(&Project { name: name.clone(), sessions: vec![] })
         })
     }
 
@@ -1511,20 +1512,20 @@ impl ProjectStore for FsStore {
 
     fn append_start(&self, name: &ProjectName, start: &jiff::Zoned, note: Option<&str>) -> Result<()> {
         self.with_lock(|| {
-            let mut p = self.load_locked(name)?;
+            let mut p = self.load_inner(name)?;
             if let Some(last) = p.sessions.last() {
                 if last.is_running() {
                     return Err(Error::AlreadyRunning(name.to_string(), last.start.to_string()));
                 }
             }
             p.sessions.push(Session { start: start.clone(), stop: None, note: note.map(str::to_string) });
-            self.save_locked(&p)
+            self.save_inner(&p)
         })
     }
 
     fn close_open(&self, name: &ProjectName, stop: &jiff::Zoned) -> Result<()> {
         self.with_lock(|| {
-            let mut p = self.load_locked(name)?;
+            let mut p = self.load_inner(name)?;
             let Some(last) = p.sessions.last_mut() else {
                 return Err(Error::NotRunning(name.to_string()));
             };
@@ -1532,7 +1533,7 @@ impl ProjectStore for FsStore {
                 return Err(Error::NotRunning(name.to_string()));
             }
             last.stop = Some(stop.clone());
-            self.save_locked(&p)
+            self.save_inner(&p)
         })
     }
 }
@@ -2655,7 +2656,7 @@ fn dispatch_new_project(key: KeyEvent, mut input: String, state: &mut AppState) 
 
 fn dispatch_confirm_delete(key: KeyEvent, state: &mut AppState) -> Action {
     match key.code {
-        KeyCode::Char('y') | KeyCode::Char('Y') => { state.modal = Modal::None; Action::DeleteConfirmed }
+        KeyCode::Char('y') | KeyCode::Char('Y') => Action::DeleteConfirmed,
         _ => { state.modal = Modal::None; Action::None }
     }
 }
