@@ -48,7 +48,7 @@ Git tracks changes to your code. It is likely already installed. Check:
 git --version
 ```
 
-If not installed, see https://git-scm.com/downloads.
+If not installed, see <https://git-scm.com/downloads>.
 
 ### Terminology
 
@@ -104,6 +104,7 @@ cargo add anyhow
 ```
 
 What each library does:
+
 - **clap** — parses command-line arguments (e.g. `zeitlupius start my-project`)
 - **ratatui** + **crossterm** — draws the terminal dashboard (TUI) and reads keyboard input
 - **jiff** — handles dates, times, and time zones correctly (including daylight saving time)
@@ -183,6 +184,7 @@ git commit -m "chore: scaffold lib+bin layout and core dependencies"
 Every program needs to handle things that go wrong: a project that does not exist, a file that cannot be read, an invalid date. We define a single `Error` type that lists every kind of problem the program can encounter. This makes error messages clear and consistent.
 
 The error type has two categories:
+
 - **User errors** — mistakes the user made (wrong project name, invalid date). The program exits with code `1`.
 - **Internal errors** — things outside the user's control (disk failure, corrupted file). The program exits with code `2`.
 
@@ -328,6 +330,7 @@ All four live in a single file `src/model.rs`. The file also includes methods on
 **Interval** represents a time range for reports. `Day(date)` means "from midnight to midnight on that date". `Week(date)` is the ISO week containing that date (Monday to Sunday). `Month(date)` is the entire month. `Year(year)` is the entire year. `Custom { from, to }` is an arbitrary date range.
 
 The methods on `Interval`:
+
 - `bounds(tz)` — returns the exact start and end timestamps for the interval in the given time zone
 - `contains(timestamp, tz)` — checks if a timestamp falls within the interval
 - `previous()` / `next()` — shifts the interval backward or forward by one unit (one day, one week, etc.)
@@ -870,6 +873,7 @@ git commit -m "feat: add domain types ProjectName, Session, Project, Interval"
 This chapter adds the functions that calculate how much tracked time falls within a given interval. The logic is simple: clip a session's `[start, end)` range to the interval's `[lo, hi)` range and measure the overlap in seconds.
 
 We create three files inside a `src/time/` directory:
+
 - `mod.rs` — declares the module and re-exports the public functions
 - `intersect.rs` — the core overlap calculation for a single session
 - `aggregate.rs` — sums overlaps across all sessions in a project
@@ -1145,6 +1149,7 @@ Storage is the layer that reads and writes project data to disk. We define a `Pr
 The data format is CSV: one file per project under `~/.zeitlupius/projects/`. An open row (empty `stop` column) means a timer is running.
 
 We also implement safety measures:
+
 - **Locking** — only one process can write at a time (prevents data corruption)
 - **Atomic writes** — data is written to a temporary file first, then renamed over the original (prevents partial writes if the program crashes)
 
@@ -1771,6 +1776,7 @@ mod tests {
 ```
 
 `FsStore` is the real storage that reads/writes CSV files on disk. Key details:
+
 - `ensure_dirs` creates the `projects/` directory and `.lock` file on first use.
 - `with_lock` acquires an exclusive file lock before any mutation, preventing two processes from corrupting data.
 - `atomic_write` writes to a temporary file then renames it — if the program crashes mid-write, the original file is untouched.
@@ -1817,6 +1823,7 @@ git commit -m "feat: add ProjectStore, MemStore, CSV codec, and FsStore"
 The `ops` module is a thin layer of functions that the CLI and TUI both call. Each function takes a store and some arguments, and returns a result. This is the single place where "business logic" lives — creating projects, starting/stopping timers, generating reports.
 
 Two design choices make this layer easy to test:
+
 - It accepts `now: &Zoned` (the current time) as a parameter, so tests can pass a fixed time instead of using the real clock.
 - It accepts any `ProjectStore`, so tests use the fast `MemStore` instead of touching the filesystem.
 
@@ -2638,6 +2645,7 @@ fn main() -> ExitCode {
 ```
 
 The `main` function:
+
 1. Parses command-line arguments
 2. Determines the data directory (CLI flag > `ZEITLUPIUS_HOME` env var > `~/.zeitlupius`)
 3. If no subcommand, launches the TUI
@@ -3795,6 +3803,7 @@ fn handle_action<S: ProjectStore>(
 ```
 
 The event loop:
+
 1. Draws the dashboard every 250 ms (so live timers update smoothly).
 2. Reads keyboard input and dispatches it to the key handler.
 3. Executes the resulting action (start/stop/create/delete) against the store.
