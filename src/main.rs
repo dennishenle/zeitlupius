@@ -1,3 +1,3 @@
 fn main() {
-    println!("Hello, world!");
+    println!("zeitlupius - placeholder; replaced in later chapters");
 }
