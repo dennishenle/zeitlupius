@@ -12,8 +12,8 @@ pub fn session_overlap_seconds(
         return 0;
     }
     let (lo, hi) = interval.bounds(tz);
-    let start = if s > &lo { s.clone() } else { lo };
-    let end = if e < &hi { e.clone() } else { hi };
+    let start = if s > lo { s.clone() } else { lo };
+    let end = if e < hi { e.clone() } else { hi };
     if end <= start {
         return 0;
     }
