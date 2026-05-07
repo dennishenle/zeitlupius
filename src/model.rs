@@ -68,7 +68,7 @@ impl Session {
 
     pub fn duration(&self, now: &jiff::Zoned) -> jiff::Span {
         let end = self.stop.as_ref().unwrap_or(now);
-        if end < &self.start {
+        if end < self.start {
             return jiff::Span::new();
         }
         end.since((jiff::Unit::Minute, &self.start))
@@ -143,7 +143,7 @@ impl Interval {
 
     pub fn contains(&self, t: &jiff::Zoned, tz: &jiff::tz::TimeZone) -> bool {
         let (lo, hi) = self.bounds(tz);
-        t >= &lo && t < &hi
+        t >= lo && t < hi
     }
 
     pub fn previous(&self) -> Self {
