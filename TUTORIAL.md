@@ -323,7 +323,7 @@ All four live in a single file `src/model.rs`. The file also includes methods on
 
 **ProjectName** only allows names made of ASCII letters, digits, hyphens, underscores, and dots. It rejects empty names, names longer than 64 characters, names starting with a dot, and names that collide with CLI commands like `list` or `start`. This prevents confusing situations where a project name looks like a command.
 
-**Session** represents one block of tracked time. It has a `start` timestamp, an optional `stop` timestamp (empty means the timer is still running), and an optional `note`. The `duration` method calculates how long the session lasted — if the timer is still running, it uses the current time.
+**Session** represents one block of tracked time. It has a `start` timestamp, an optional `stop` timestamp (empty means the timer is still running), and an optional `note`. The `duration` method calculates how long the session lasted — if the timer is still running, it uses the current time. We pass `(jiff::Unit::Minute, &self.start)` to `since` so the resulting span is balanced down to minutes; otherwise jiff defaults to hours as the largest unit and `Span::get_minutes()` would only return the minute *component* (e.g. `1h 30m` → `30`) rather than the total minutes.
 
 **Project** is simply a name and a list of sessions. The `running_session` method returns the currently active session, if any.
 
@@ -408,7 +408,7 @@ impl Session {
         if end < &self.start {
             return jiff::Span::new();
         }
-        end.since(&self.start)
+        end.since((jiff::Unit::Minute, &self.start))
             .unwrap_or_else(|_| jiff::Span::new())
     }
 }
@@ -856,7 +856,7 @@ pub use model::ProjectName;
 cargo test --lib model::tests
 ```
 
-You should see `24 passed` (6 for ProjectName, 4 for Session/Project, 14 for Interval).
+You should see `22 passed` (6 for ProjectName, 4 for Session/Project, 12 for Interval).
 
 ### Step 4: Commit
 
