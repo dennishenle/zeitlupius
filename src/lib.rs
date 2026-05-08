@@ -2,7 +2,9 @@
 
 pub mod error;
 pub mod model;
+pub mod storage;
 pub mod time;
 
 pub use error::{Error, ErrorKind, Result};
 pub use model::ProjectName;
+pub use storage::ProjectStore;
