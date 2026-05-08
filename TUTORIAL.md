@@ -2131,7 +2131,6 @@ pub struct ReportArgs {
 }
 
 #[derive(Args, Debug)]
-#[group(multiple = false)]
 pub struct IntervalArgs {
     #[arg(long, group = "iv")]
     pub day: bool,
@@ -2141,7 +2140,7 @@ pub struct IntervalArgs {
     pub month: bool,
     #[arg(long, group = "iv")]
     pub year: bool,
-    #[arg(long, value_name = "DD.MM.YYYY", requires = "to")]
+    #[arg(long, group = "iv", value_name = "DD.MM.YYYY", requires = "to")]
     pub from: Option<String>,
     #[arg(long, value_name = "DD.MM.YYYY", requires = "from")]
     pub to: Option<String>,
