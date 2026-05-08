@@ -24,3 +24,7 @@ target
 # Added by cargo
 
 /target
+
+# Agent related files
+.claude/
+docs/superpowers
