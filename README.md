@@ -2,6 +2,8 @@
 
 Terminal time tracking — a Ratatui TUI plus a feature-equivalent CLI. Each project's sessions live in a CSV under `~/.zeitlupius/projects/`.
 
+![Running App](screenshots/runnig.png)
+
 ## Install
 
     cargo install --path .
