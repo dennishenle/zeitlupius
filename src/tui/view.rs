@@ -135,6 +135,8 @@ fn draw_detail(f: &mut Frame, area: Rect, data: &DashboardData) {
         )));
     }
     lines.push(Line::from(""));
+
+    // Active sessions
     if let Some(s) = p.running_session() {
         let r = (data.now.timestamp().as_second() - s.start.timestamp().as_second()).max(0);
         lines.push(Line::from(Span::styled(
@@ -143,7 +145,7 @@ fn draw_detail(f: &mut Frame, area: Rect, data: &DashboardData) {
         )));
         lines.push(Line::from(format!(
             " started {} for {}",
-            s.start,
+            s.start.strftime("%d.%m.%Y %H:%M:%S"),
             fmt_hms(r)
         )));
         lines.push(Line::from(""));
@@ -152,9 +154,11 @@ fn draw_detail(f: &mut Frame, area: Rect, data: &DashboardData) {
         "Recent sessions (last 5)",
         Style::default().add_modifier(Modifier::BOLD),
     )));
+
+    // Last 5 sessions
     for s in p.sessions.iter().rev().take(5) {
         let stop = match &s.stop {
-            Some(z) => z.to_string(),
+            Some(z) => z.strftime("%d.%m.%Y %H:%M:%S").to_string(),
             None => "running".to_string(),
         };
         let secs = match &s.stop {
@@ -163,7 +167,7 @@ fn draw_detail(f: &mut Frame, area: Rect, data: &DashboardData) {
         };
         lines.push(Line::from(format!(
             " {}  →  {}    {}",
-            s.start,
+            s.start.strftime("%d.%m.%Y %H:%M:%S"),
             stop,
             fmt_hms(secs)
         )));
