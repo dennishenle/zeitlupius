@@ -20,18 +20,22 @@ pub fn draw(f: &mut Frame, data: &DashboardData) {
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),
-            Constraint::Min(0),
-            Constraint::Length(2),
+            Constraint::Length(1), // Header
+            Constraint::Length(1), // Spacer
+            Constraint::Min(0),    // Body
+            Constraint::Length(2), // Footer
         ])
         .split(area);
-    draw_header(f, outer[0], data);
+    let header = outer[0];
+    let body = outer[2];
+    let footer = outer[3];
+    draw_header(f, header, data);
     if data.projects.is_empty() {
-        draw_empty(f, outer[1]);
+        draw_empty(f, body);
     } else {
-        draw_body(f, outer[1], data);
+        draw_body(f, body, data);
     }
-    draw_footer(f, outer[2], data);
+    draw_footer(f, footer, data);
     if !matches!(data.state.modal, Modal::None) {
         super::modals::draw(f, area, &data.state.modal);
     }
