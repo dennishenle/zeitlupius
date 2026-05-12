@@ -111,10 +111,34 @@ fn report<S: ProjectStore, W: Write>(
         writeln!(out, "],\"total_seconds\":{}}}", rep.total_seconds)?;
     } else {
         writeln!(out, "{}", rep.interval.label())?;
+        let name_width = rep
+            .rows
+            .iter()
+            .map(|r| r.name.as_str().len())
+            .chain(std::iter::once("TOTAL".len()))
+            .max()
+            .unwrap_or("TOTAL".len());
+        let time_width = rep
+            .rows
+            .iter()
+            .map(|r| fmt_hm(r.seconds).len())
+            .chain(std::iter::once(fmt_hm(rep.total_seconds).len()))
+            .max()
+            .unwrap_or_else(|| fmt_hm(rep.total_seconds).len());
         for r in &rep.rows {
-            writeln!(out, "  {:<20}  {}", r.name, fmt_hm(r.seconds))?;
+            writeln!(
+                out,
+                "  {:<name_width$}  {:>time_width$}",
+                r.name.as_str(),
+                fmt_hm(r.seconds)
+            )?;
         }
-        writeln!(out, "  {:<20}  {}", "TOTAL", fmt_hm(rep.total_seconds))?;
+        writeln!(
+            out,
+            "  {:<name_width$}  {:>time_width$}",
+            "TOTAL",
+            fmt_hm(rep.total_seconds)
+        )?;
     }
     Ok(())
 }
@@ -264,6 +288,99 @@ mod tests {
         let txt = String::from_utf8(buf).unwrap();
         assert!(txt.contains("1:00"));
         assert!(txt.contains("TOTAL"));
+    }
+
+    #[test]
+    fn report_aligns_time_column() {
+        let s = MemStore::new();
+        let mut sink = Vec::new();
+
+        for project in ["short", "longer-name"] {
+            run(
+                &s,
+                Command::Create {
+                    project: project.into(),
+                },
+                &mut sink,
+                &z(8),
+                &TimeZone::UTC,
+            )
+            .unwrap();
+        }
+
+        run(
+            &s,
+            Command::Start {
+                project: "short".into(),
+                note: None,
+            },
+            &mut sink,
+            &z(8),
+            &TimeZone::UTC,
+        )
+        .unwrap();
+        run(
+            &s,
+            Command::Stop {
+                project: "short".into(),
+            },
+            &mut sink,
+            &z(9),
+            &TimeZone::UTC,
+        )
+        .unwrap();
+        run(
+            &s,
+            Command::Start {
+                project: "longer-name".into(),
+                note: None,
+            },
+            &mut sink,
+            &z(9),
+            &TimeZone::UTC,
+        )
+        .unwrap();
+        run(
+            &s,
+            Command::Stop {
+                project: "longer-name".into(),
+            },
+            &mut sink,
+            &z(12),
+            &TimeZone::UTC,
+        )
+        .unwrap();
+
+        let mut buf = Vec::new();
+        run(
+            &s,
+            Command::Report(ReportArgs {
+                project: None,
+                interval: IntervalArgs {
+                    day: true,
+                    week: false,
+                    month: false,
+                    year: false,
+                    from: None,
+                    to: None,
+                },
+                page: 0,
+                json: false,
+            }),
+            &mut buf,
+            &z(23),
+            &TimeZone::UTC,
+        )
+        .unwrap();
+
+        let txt = String::from_utf8(buf).unwrap();
+        let time_columns: Vec<_> = txt
+            .lines()
+            .skip(1)
+            .map(|line| line.find(':').unwrap())
+            .collect();
+
+        assert!(time_columns.windows(2).all(|cols| cols[0] == cols[1]));
     }
 
     #[test]
