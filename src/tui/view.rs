@@ -8,6 +8,8 @@ use crate::cli::format::{fmt_hm, fmt_hms};
 use crate::model::{Interval, Project};
 use crate::tui::app::{AppState, Modal};
 
+const PROJECT_NAME_WIDTH: usize = 24;
+
 pub struct DashboardData<'a> {
     pub state: &'a AppState,
     pub projects: &'a [Project],
@@ -89,11 +91,11 @@ fn draw_project_list(f: &mut Frame, area: Rect, data: &DashboardData) {
             let mut spans = Vec::new();
             if let Some(r) = running {
                 spans.push(Span::styled("● ", Style::default().fg(Color::Green)));
-                spans.push(Span::raw(format!("{:<24}", p.name)));
+                spans.push(Span::raw(format_project_name_for_list(p.name.as_str())));
                 spans.push(Span::styled(fmt_hms(r), Style::default().fg(Color::Green)));
             } else {
                 spans.push(Span::raw("  "));
-                spans.push(Span::raw(format!("{:<24}", p.name)));
+                spans.push(Span::raw(format_project_name_for_list(p.name.as_str())));
                 spans.push(Span::raw(fmt_hm(secs)));
             }
             ListItem::new(Line::from(spans))
@@ -105,6 +107,14 @@ fn draw_project_list(f: &mut Frame, area: Rect, data: &DashboardData) {
         .block(Block::default().borders(Borders::RIGHT).title("Projects"))
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
     f.render_stateful_widget(list, area, &mut ls);
+}
+
+fn format_project_name_for_list(name: &str) -> String {
+    if name.len() >= PROJECT_NAME_WIDTH {
+        format!("{name} ")
+    } else {
+        format!("{name:<width$}", width = PROJECT_NAME_WIDTH)
+    }
 }
 
 fn draw_detail(f: &mut Frame, area: Rect, data: &DashboardData) {
@@ -259,5 +269,51 @@ mod tests {
             )
         })
         .unwrap();
+    }
+
+    #[test]
+    fn running_timer_is_separated_from_long_project_name() {
+        let backend = TestBackend::new(100, 25);
+        let mut term = Terminal::new(backend).unwrap();
+        let project_name = ProjectName::parse("long-project-name-over-width").unwrap();
+        let projects = vec![Project {
+            name: project_name.clone(),
+            sessions: vec![Session {
+                start: z(9),
+                stop: None,
+                note: None,
+            }],
+        }];
+        let state = AppState::new(date(2026, 5, 4), vec![project_name]);
+        let now = z(10);
+        let tz = TimeZone::UTC;
+        term.draw(|f| {
+            draw(
+                f,
+                &DashboardData {
+                    state: &state,
+                    projects: &projects,
+                    now: &now,
+                    tz: &tz,
+                },
+            )
+        })
+        .unwrap();
+
+        let rendered = backend_lines(term.backend()).join("\n");
+
+        assert!(rendered.contains("long-project-name-over-width 01:00:00"));
+    }
+
+    fn backend_lines(backend: &TestBackend) -> Vec<String> {
+        let buffer = backend.buffer();
+
+        (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer.cell((x, y)).unwrap().symbol())
+                    .collect::<String>()
+            })
+            .collect()
     }
 }
