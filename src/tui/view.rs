@@ -15,7 +15,6 @@ pub struct DashboardData<'a> {
     pub tz: &'a jiff::tz::TimeZone,
 }
 
-#[allow(dead_code)]
 fn right_aligned_row(
     left: Vec<(String, Style)>,
     right: (String, Style),
@@ -137,6 +136,8 @@ fn draw_body(f: &mut Frame, area: Rect, data: &DashboardData) {
 
 fn draw_project_list(f: &mut Frame, area: Rect, data: &DashboardData) {
     use crate::time::project_total_in;
+    let target = (area.width as usize).saturating_sub(3); // 2 borders + 1 right gap
+
     let items: Vec<ListItem> = data
         .projects
         .iter()
@@ -146,17 +147,25 @@ fn draw_project_list(f: &mut Frame, area: Rect, data: &DashboardData) {
                 let r = data.now.timestamp().as_second() - s.start.timestamp().as_second();
                 r.max(0)
             });
-            let mut spans = Vec::new();
-            if let Some(r) = running {
-                spans.push(Span::styled("● ", Style::default().fg(Color::Green)));
-                spans.push(Span::raw(format!("{:<24}", p.name)));
-                spans.push(Span::styled(fmt_hms(r), Style::default().fg(Color::Green)));
+            let (left, right) = if let Some(r) = running {
+                let green = Style::default().fg(Color::Green);
+                (
+                    vec![
+                        ("● ".to_string(), green),
+                        (p.name.to_string(), Style::default()),
+                    ],
+                    (fmt_hms(r), green),
+                )
             } else {
-                spans.push(Span::raw("  "));
-                spans.push(Span::raw(format!("{:<24}", p.name)));
-                spans.push(Span::raw(fmt_hm(secs)));
-            }
-            ListItem::new(Line::from(spans))
+                (
+                    vec![
+                        ("  ".to_string(), Style::default()),
+                        (p.name.to_string(), Style::default()),
+                    ],
+                    (fmt_hm(secs), Style::default()),
+                )
+            };
+            ListItem::new(right_aligned_row(left, right, target))
         })
         .collect();
     let mut ls = ListState::default();
@@ -569,5 +578,64 @@ mod tests {
         let narrow = right_aligned_row(vec![], ("1:23".to_string(), Style::default()), 3);
         let rendered: String = narrow.spans.iter().map(|s| s.content.as_ref()).collect();
         assert!(rendered.ends_with("1:23"));
+    }
+
+    #[test]
+    fn projects_panel_right_aligns_time() {
+        let backend = TestBackend::new(60, 12);
+        let mut term = Terminal::new(backend).unwrap();
+        let projects = vec![Project {
+            name: ProjectName::parse("alpha").unwrap(),
+            sessions: vec![Session {
+                start: z(9),
+                stop: Some(z(10)),
+                note: None,
+            }],
+        }];
+        let names = vec![ProjectName::parse("alpha").unwrap()];
+        let state = AppState::new(date(2026, 5, 4), names);
+        let now = z(11);
+        let tz = TimeZone::UTC;
+        term.draw(|f| {
+            draw(
+                f,
+                &DashboardData {
+                    state: &state,
+                    projects: &projects,
+                    now: &now,
+                    tz: &tz,
+                },
+            )
+        })
+        .unwrap();
+
+        // Projects panel occupies the top-left quadrant.
+        // Left column width is 40% of 60 = 24 cols (cols 0..24).
+        // Right border is at col 23; last inner column is 22.
+        // Find the row containing the project name (avoid hardcoding y which
+        // depends on ratatui's Percentage split rounding).
+        let buf = term.backend().buffer();
+        let left_width: u16 = 24;
+        let inner_right: u16 = left_width - 2; // = 22
+        let mut row_y: Option<u16> = None;
+        for y in 0..buf.area.height {
+            let mut row = String::new();
+            for x in 0..left_width {
+                row.push_str(buf[(x, y)].symbol());
+            }
+            if row.contains("alpha") {
+                row_y = Some(y);
+                break;
+            }
+        }
+        let row_y = row_y.expect("project row containing 'alpha' not found");
+
+        // Column inner_right (one before the right border) must be a space.
+        let gap = buf[(inner_right, row_y)].symbol();
+        assert_eq!(gap, " ", "expected 1-char gap before right border");
+
+        // Column inner_right-1 must be the last digit of "1:00" (= '0').
+        let last = buf[(inner_right - 1, row_y)].symbol();
+        assert_eq!(last, "0", "time should end at inner_right - 1");
     }
 }
