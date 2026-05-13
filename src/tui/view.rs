@@ -15,6 +15,55 @@ pub struct DashboardData<'a> {
     pub tz: &'a jiff::tz::TimeZone,
 }
 
+#[allow(dead_code)]
+fn right_aligned_row(
+    left: Vec<(String, Style)>,
+    right: (String, Style),
+    target: usize,
+) -> Line<'static> {
+    let left_width: usize = left.iter().map(|(t, _)| t.chars().count()).sum();
+    let right_width = right.0.chars().count();
+
+    // Impossibly narrow: just show the right value, no panic.
+    if target < right_width + 2 {
+        return Line::from(Span::styled(right.0, right.1));
+    }
+
+    // Fits with at least one filler space.
+    if left_width + 1 + right_width <= target {
+        let filler = " ".repeat(target - left_width - right_width);
+        let mut spans: Vec<Span<'static>> = left
+            .into_iter()
+            .map(|(t, s)| Span::styled(t, s))
+            .collect();
+        spans.push(Span::raw(filler));
+        spans.push(Span::styled(right.0, right.1));
+        return Line::from(spans);
+    }
+
+    // Overflow: truncate the LAST left segment with "…".
+    // Budget for left text (excluding the "…" glyph and the 1-col gap):
+    //   max_text = target - right_width - 2
+    //   final width = max_text + 1 (…) + 1 (gap) + right_width = target
+    let max_text = target.saturating_sub(right_width + 2);
+    let last_idx = left.len() - 1;
+    let mut spans: Vec<Span<'static>> = Vec::with_capacity(left.len() + 2);
+    let mut remaining = max_text;
+    for (i, (text, style)) in left.into_iter().enumerate() {
+        if i < last_idx {
+            let w = text.chars().count();
+            spans.push(Span::styled(text, style));
+            remaining = remaining.saturating_sub(w);
+        } else {
+            let truncated: String = text.chars().take(remaining).collect();
+            spans.push(Span::styled(format!("{truncated}…"), style));
+        }
+    }
+    spans.push(Span::raw(" "));
+    spans.push(Span::styled(right.0, right.1));
+    Line::from(spans)
+}
+
 pub fn draw(f: &mut Frame, data: &DashboardData) {
     let area = f.area();
     let outer = Layout::default()
@@ -407,5 +456,76 @@ mod tests {
             !text.contains("04.05.2026 09:00:00"),
             "non-selected project's session leaked into left half"
         );
+    }
+
+    #[test]
+    fn right_aligned_row_fits_with_filler() {
+        let line = right_aligned_row(
+            vec![("hello".to_string(), Style::default())],
+            ("world".to_string(), Style::default()),
+            20,
+        );
+        let rendered: String = line
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert_eq!(rendered.chars().count(), 20, "row should fill exactly target");
+        assert!(rendered.starts_with("hello"));
+        assert!(rendered.ends_with("world"));
+    }
+
+    #[test]
+    fn right_aligned_row_truncates_when_overflow() {
+        let line = right_aligned_row(
+            vec![("verylongprojectname".to_string(), Style::default())],
+            ("1:23".to_string(), Style::default()),
+            10,
+        );
+        let rendered: String = line
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert_eq!(rendered.chars().count(), 10, "row should fill exactly target");
+        assert!(rendered.contains('…'), "truncation marker expected");
+        assert!(rendered.ends_with("1:23"), "right value must be intact");
+    }
+
+    #[test]
+    fn right_aligned_row_keeps_indicator_when_truncating_name() {
+        let line = right_aligned_row(
+            vec![
+                ("● ".to_string(), Style::default()),
+                ("verylongprojectname".to_string(), Style::default()),
+            ],
+            ("1:23".to_string(), Style::default()),
+            12,
+        );
+        let rendered: String = line
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert_eq!(rendered.chars().count(), 12);
+        assert!(rendered.starts_with("● "), "indicator must be preserved");
+        assert!(rendered.contains('…'));
+        assert!(rendered.ends_with("1:23"));
+    }
+
+    #[test]
+    fn right_aligned_row_handles_too_narrow_gracefully() {
+        // target smaller than right + 2 falls back to just the right value, no panic.
+        let line = right_aligned_row(
+            vec![("name".to_string(), Style::default())],
+            ("1:23".to_string(), Style::default()),
+            3,
+        );
+        let rendered: String = line
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(rendered.ends_with("1:23"));
     }
 }
