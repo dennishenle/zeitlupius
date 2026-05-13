@@ -52,8 +52,14 @@ fn right_aligned_row(
     for (i, (text, style)) in left.into_iter().enumerate() {
         if i < last_idx {
             let w = text.chars().count();
-            spans.push(Span::styled(text, style));
-            remaining = remaining.saturating_sub(w);
+            if w <= remaining {
+                spans.push(Span::styled(text, style));
+                remaining -= w;
+            } else {
+                let truncated: String = text.chars().take(remaining).collect();
+                spans.push(Span::styled(truncated, style));
+                remaining = 0;
+            }
         } else {
             let truncated: String = text.chars().take(remaining).collect();
             spans.push(Span::styled(format!("{truncated}…"), style));
@@ -526,6 +532,42 @@ mod tests {
             .iter()
             .map(|s| s.content.as_ref())
             .collect();
+        assert!(rendered.ends_with("1:23"));
+    }
+
+    #[test]
+    fn right_aligned_row_truncates_first_of_two_left_segments() {
+        // First segment is wider than the truncation budget. Result must still
+        // fill exactly `target` columns.
+        let line = right_aligned_row(
+            vec![
+                ("AAAA".to_string(), Style::default()),
+                ("BB".to_string(), Style::default()),
+            ],
+            ("CC".to_string(), Style::default()),
+            6,
+        );
+        let rendered: String = line
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert_eq!(rendered.chars().count(), 6, "row should fill exactly target");
+        assert!(rendered.ends_with("CC"));
+        assert!(rendered.contains('…'));
+    }
+
+    #[test]
+    fn right_aligned_row_empty_left_does_not_panic() {
+        // Empty left should never reach the overflow branch (provable), but exercise
+        // both fits and narrow paths explicitly.
+        let fits = right_aligned_row(vec![], ("1:23".to_string(), Style::default()), 10);
+        let rendered: String = fits.spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(rendered.chars().count(), 10);
+        assert!(rendered.ends_with("1:23"));
+
+        let narrow = right_aligned_row(vec![], ("1:23".to_string(), Style::default()), 3);
+        let rendered: String = narrow.spans.iter().map(|s| s.content.as_ref()).collect();
         assert!(rendered.ends_with("1:23"));
     }
 }
