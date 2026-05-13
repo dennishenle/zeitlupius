@@ -30,13 +30,24 @@ mod tests {
             .unwrap()
     }
     fn closed(start: jiff::Zoned, stop: jiff::Zoned) -> Session {
-        Session { start, stop: Some(stop), note: None }
+        Session {
+            start,
+            stop: Some(stop),
+            note: None,
+        }
     }
     fn open(start: jiff::Zoned) -> Session {
-        Session { start, stop: None, note: None }
+        Session {
+            start,
+            stop: None,
+            note: None,
+        }
     }
     fn project_with(sessions: Vec<Session>) -> Project {
-        Project { name: ProjectName::parse("p").unwrap(), sessions }
+        Project {
+            name: ProjectName::parse("p").unwrap(),
+            sessions,
+        }
     }
 
     #[test]
