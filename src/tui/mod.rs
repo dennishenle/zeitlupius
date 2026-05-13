@@ -42,6 +42,20 @@ pub fn run<S: ProjectStore>(store: &S, tz: &TimeZone) -> Result<()> {
     result
 }
 
+fn refresh_session_count(
+    state: &mut AppState,
+    projects: &[Project],
+    now: &jiff::Zoned,
+    tz: &TimeZone,
+) {
+    use crate::time::sessions_in;
+    let count = match projects.get(state.selected) {
+        Some(p) => sessions_in(p, &state.interval, now, tz).len(),
+        None => 0,
+    };
+    state.clamp_session_selected(count);
+}
+
 fn event_loop<S: ProjectStore>(
     store: &S,
     tz: &TimeZone,
@@ -51,6 +65,7 @@ fn event_loop<S: ProjectStore>(
     let names = ops::list(store)?;
     let mut state = AppState::new(now.date(), names.clone());
     let mut projects = load_all(store, &names)?;
+    refresh_session_count(&mut state, &projects, &now, tz);
     let mut last_reload = Instant::now();
 
     while !state.should_quit {
@@ -60,6 +75,7 @@ fn event_loop<S: ProjectStore>(
         {
             state.status_line = None;
         }
+        refresh_session_count(&mut state, &projects, &now, tz);
         term.draw(|f| {
             draw_dashboard(
                 f,
@@ -83,6 +99,7 @@ fn event_loop<S: ProjectStore>(
                     state.projects = names.clone();
                     state.ensure_selection_valid();
                     projects = load_all(store, &names)?;
+                    refresh_session_count(&mut state, &projects, &now, tz);
                 }
                 Ok(false) => {}
                 Err(e) => state.set_status(format!("error: {e}")),
@@ -94,6 +111,7 @@ fn event_loop<S: ProjectStore>(
             state.projects = names.clone();
             state.ensure_selection_valid();
             projects = load_all(store, &names)?;
+            refresh_session_count(&mut state, &projects, &now, tz);
             last_reload = Instant::now();
         }
     }
