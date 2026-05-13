@@ -160,5 +160,6 @@ fn handle_action<S: ProjectStore>(
             state.interval = Interval::Custom { from, to };
             Ok(false)
         }
+        Action::ToggleFocus => Ok(false),
     }
 }
