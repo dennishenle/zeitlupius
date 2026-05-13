@@ -11,7 +11,6 @@ pub enum Action {
     DeleteConfirmed,
     ApplyCustomInterval(jiff::civil::Date, jiff::civil::Date),
     Reload,
-    ToggleFocus,
 }
 
 pub fn dispatch(key: KeyEvent, state: &mut AppState, today: jiff::civil::Date) -> Action {
@@ -49,7 +48,6 @@ fn dispatch_dashboard(key: KeyEvent, state: &mut AppState, today: jiff::civil::D
             state.modal = Modal::Help;
             Action::None
         }
-        KeyCode::Tab => Action::ToggleFocus,
         KeyCode::Char('j') | KeyCode::Down => {
             state.move_down();
             Action::None
@@ -284,23 +282,5 @@ mod tests {
             crate::model::Interval::Day(d) => assert_eq!(d, date(2026, 5, 3)),
             _ => panic!(),
         }
-    }
-
-    #[test]
-    fn tab_returns_toggle_focus_action() {
-        let mut s = AppState::new(date(2026, 5, 4), names(&["a"]));
-        let a = dispatch(key(KeyCode::Tab), &mut s, date(2026, 5, 4));
-        assert!(matches!(a, Action::ToggleFocus));
-    }
-
-    #[test]
-    fn jk_routes_to_session_when_focus_sessions() {
-        use crate::tui::app::Focus;
-        let mut s = AppState::new(date(2026, 5, 4), names(&["a"]));
-        s.focus = Focus::Sessions;
-        s.session_count = 3;
-        dispatch(key(KeyCode::Char('j')), &mut s, date(2026, 5, 4));
-        assert_eq!(s.session_selected, 1);
-        assert_eq!(s.selected, 0);
     }
 }

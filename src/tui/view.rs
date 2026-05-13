@@ -80,17 +80,8 @@ fn draw_body(f: &mut Frame, area: Rect, data: &DashboardData) {
     draw_detail(f, cols[1], data);
 }
 
-fn focused_border_style(focused: bool) -> Style {
-    if focused {
-        Style::default().add_modifier(Modifier::BOLD)
-    } else {
-        Style::default()
-    }
-}
-
 fn draw_project_list(f: &mut Frame, area: Rect, data: &DashboardData) {
     use crate::time::project_total_in;
-    use crate::tui::app::Focus;
     let items: Vec<ListItem> = data
         .projects
         .iter()
@@ -115,26 +106,18 @@ fn draw_project_list(f: &mut Frame, area: Rect, data: &DashboardData) {
         .collect();
     let mut ls = ListState::default();
     ls.select(Some(data.state.selected));
-    let focused = data.state.focus == Focus::Projects;
     let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(focused_border_style(focused))
-                .title("Projects"),
-        )
+        .block(Block::default().borders(Borders::ALL).title("Projects"))
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
     f.render_stateful_widget(list, area, &mut ls);
 }
 
 fn draw_sessions_panel(f: &mut Frame, area: Rect, data: &DashboardData) {
     use crate::time::sessions_in;
-    use crate::tui::app::Focus;
     let sessions: Vec<&crate::model::Session> = match data.projects.get(data.state.selected) {
         Some(p) => sessions_in(p, &data.state.interval, data.now, data.tz),
         None => Vec::new(),
     };
-    let count = sessions.len();
     let items: Vec<ListItem> = sessions
         .iter()
         .map(|s| {
@@ -155,23 +138,8 @@ fn draw_sessions_panel(f: &mut Frame, area: Rect, data: &DashboardData) {
             )))
         })
         .collect();
-    let focused = data.state.focus == Focus::Sessions;
-    let mut ls = ListState::default();
-    let sel = if count == 0 {
-        None
-    } else {
-        Some(data.state.session_selected.min(count - 1))
-    };
-    ls.select(sel);
-    let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(focused_border_style(focused))
-                .title("Sessions"),
-        )
-        .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
-    f.render_stateful_widget(list, area, &mut ls);
+    let list = List::new(items).block(Block::default().borders(Borders::ALL).title("Sessions"));
+    f.render_widget(list, area);
 }
 
 fn draw_detail(f: &mut Frame, area: Rect, data: &DashboardData) {
@@ -248,7 +216,7 @@ fn draw_footer(f: &mut Frame, area: Rect, data: &DashboardData) {
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Length(1)])
         .split(area);
-    let line1 = "d/w/m/y interval · ←/→ page · c custom · j/k select · Tab focus";
+    let line1 = "d/w/m/y interval · ←/→ page · c custom · j/k select";
     let line2 = "s start · S stop · n new · D delete · r reload · ? help · q quit";
     f.render_widget(Paragraph::new(line1), split[0]);
     let l2 = if let Some((msg, _)) = &data.state.status_line {
@@ -266,7 +234,6 @@ fn draw_footer(f: &mut Frame, area: Rect, data: &DashboardData) {
 mod tests {
     use super::*;
     use crate::model::{Project, ProjectName, Session};
-    use crate::tui::app::Focus;
     use jiff::{civil::date, tz::TimeZone};
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
@@ -440,43 +407,5 @@ mod tests {
             !text.contains("04.05.2026 09:00:00"),
             "non-selected project's session leaked into left half"
         );
-    }
-
-    #[test]
-    fn focused_panel_border_is_bold() {
-        // We can't easily diff styles via TestBackend text, so just assert no panic
-        // when rendering with Focus::Sessions and that the panel still appears.
-        let backend = TestBackend::new(120, 30);
-        let mut term = Terminal::new(backend).unwrap();
-        let projects = vec![Project {
-            name: ProjectName::parse("p").unwrap(),
-            sessions: vec![Session {
-                start: z(9),
-                stop: Some(z(10)),
-                note: None,
-            }],
-        }];
-        let names = vec![ProjectName::parse("p").unwrap()];
-        let mut state = AppState::new(date(2026, 5, 4), names);
-        state.focus = Focus::Sessions;
-        let now = date(2026, 5, 4)
-            .at(12, 0, 0, 0)
-            .to_zoned(TimeZone::UTC)
-            .unwrap();
-        let tz = TimeZone::UTC;
-        term.draw(|f| {
-            draw(
-                f,
-                &DashboardData {
-                    state: &state,
-                    projects: &projects,
-                    now: &now,
-                    tz: &tz,
-                },
-            )
-        })
-        .unwrap();
-        let text = buffer_left_half(&term);
-        assert!(text.contains("Sessions"));
     }
 }
