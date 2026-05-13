@@ -178,6 +178,8 @@ fn draw_project_list(f: &mut Frame, area: Rect, data: &DashboardData) {
 
 fn draw_sessions_panel(f: &mut Frame, area: Rect, data: &DashboardData) {
     use crate::time::sessions_in;
+    let target = (area.width as usize).saturating_sub(3); // 2 borders + 1 right gap
+
     let sessions: Vec<&crate::model::Session> = match data.projects.get(data.state.selected) {
         Some(p) => sessions_in(p, &data.state.interval, data.now, data.tz),
         None => Vec::new(),
@@ -194,12 +196,12 @@ fn draw_sessions_panel(f: &mut Frame, area: Rect, data: &DashboardData) {
                 Some(stop) => stop.timestamp().as_second() - s.start.timestamp().as_second(),
                 None => 0,
             };
-            ListItem::new(Line::from(format!(
-                "{} →  {}    {}",
-                s.start.strftime("%d.%m.%Y %H:%M:%S"),
-                stop,
-                fmt_hms(secs),
-            )))
+            let left_text = format!("{} → {}", s.start.strftime("%d.%m.%Y %H:%M:%S"), stop);
+            ListItem::new(right_aligned_row(
+                vec![(left_text, Style::default())],
+                (fmt_hms(secs), Style::default()),
+                target,
+            ))
         })
         .collect();
     let list = List::new(items).block(Block::default().borders(Borders::ALL).title("Sessions"));
@@ -578,6 +580,64 @@ mod tests {
         let narrow = right_aligned_row(vec![], ("1:23".to_string(), Style::default()), 3);
         let rendered: String = narrow.spans.iter().map(|s| s.content.as_ref()).collect();
         assert!(rendered.ends_with("1:23"));
+    }
+
+    #[test]
+    fn sessions_panel_right_aligns_duration() {
+        let backend = TestBackend::new(80, 24);
+        let mut term = Terminal::new(backend).unwrap();
+        let projects = vec![Project {
+            name: ProjectName::parse("p").unwrap(),
+            sessions: vec![Session {
+                start: z(9),
+                stop: Some(z(10)),
+                note: None,
+            }],
+        }];
+        let names = vec![ProjectName::parse("p").unwrap()];
+        let state = AppState::new(date(2026, 5, 4), names);
+        let now = z(11);
+        let tz = TimeZone::UTC;
+        term.draw(|f| {
+            draw(
+                f,
+                &DashboardData {
+                    state: &state,
+                    projects: &projects,
+                    now: &now,
+                    tz: &tz,
+                },
+            )
+        })
+        .unwrap();
+
+        // Sessions panel occupies the bottom half of the left column.
+        // Left column width = 40% of 80 = 32 cols (0..32). Right border at
+        // col 31; last inner column at 30. Find the row containing the start
+        // timestamp instead of hardcoding y.
+        let buf = term.backend().buffer();
+        let left_width: u16 = 32;
+        let inner_right: u16 = left_width - 2; // = 30
+        let mut row_y: Option<u16> = None;
+        for y in 0..buf.area.height {
+            let mut row = String::new();
+            for x in 0..left_width {
+                row.push_str(buf[(x, y)].symbol());
+            }
+            if row.contains("04.05.2026 09:00:00") {
+                row_y = Some(y);
+                break;
+            }
+        }
+        let row_y = row_y.expect("sessions row with start timestamp not found");
+
+        // Column inner_right (one before the right border) must be a space.
+        let gap = buf[(inner_right, row_y)].symbol();
+        assert_eq!(gap, " ", "expected 1-char gap before right border");
+
+        // Column inner_right - 1 must be the last digit of the duration "1:00:00" → '0'.
+        let last = buf[(inner_right - 1, row_y)].symbol();
+        assert_eq!(last, "0", "duration should end at inner_right - 1");
     }
 
     #[test]
