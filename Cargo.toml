@@ -9,6 +9,7 @@ clap = { version = "4.6.1", features = ["derive"] }
 crossterm = "0.29.0"
 csv = "1.4.0"
 fd-lock = "4.0.4"
+getrandom = "0.2"
 jiff = { version = "0.2.24", features = ["serde"] }
 ratatui = "0.30.0"
 serde = { version = "1.0.228", features = ["derive"] }
