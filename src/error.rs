@@ -8,6 +8,8 @@ pub enum Error {
     ProjectAlreadyExists(String),
     #[error("invalid project name '{0}': {1}")]
     InvalidProjectName(String, &'static str),
+    #[error("invalid session id '{0}': {1}")]
+    InvalidSessionId(String, &'static str),
     #[error("project '{0}' is already running (session started at {1})")]
     AlreadyRunning(String, String),
     #[error("project '{0}' is not running")]
@@ -38,6 +40,7 @@ impl Error {
             Error::ProjectNotFound(_)
             | Error::ProjectAlreadyExists(_)
             | Error::InvalidProjectName(_, _)
+            | Error::InvalidSessionId(_, _)
             | Error::AlreadyRunning(_, _)
             | Error::NotRunning(_)
             | Error::InvalidDate(_)

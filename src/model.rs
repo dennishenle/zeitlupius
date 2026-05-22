@@ -1,4 +1,5 @@
 use crate::error::{Error, Result};
+use getrandom;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ProjectName(String);
@@ -49,6 +50,62 @@ impl ProjectName {
 }
 
 impl std::fmt::Display for ProjectName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+const SESSION_ID_LEN: usize = 8;
+const BASE32_ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct SessionId(String);
+
+impl SessionId {
+    pub fn parse(raw: &str) -> Result<Self> {
+        if raw.len() != SESSION_ID_LEN {
+            return Err(Error::InvalidSessionId(
+                raw.into(),
+                "must be exactly 8 characters",
+            ));
+        }
+        let mut buf = String::with_capacity(SESSION_ID_LEN);
+        for ch in raw.chars() {
+            let lower = ch.to_ascii_lowercase();
+            if !BASE32_ALPHABET.contains(&(lower as u8)) {
+                return Err(Error::InvalidSessionId(
+                    raw.into(),
+                    "only base32 chars [a-z2-7] allowed",
+                ));
+            }
+            buf.push(lower);
+        }
+        Ok(Self(buf))
+    }
+
+    pub fn generate() -> Self {
+        let mut bytes = [0u8; 5]; // 5 bytes = 40 bits = 8 base32 chars
+        getrandom::getrandom(&mut bytes).expect("OS RNG must work");
+        let mut out = String::with_capacity(SESSION_ID_LEN);
+        // Pack 5 bytes into 8 5-bit groups.
+        let packed: u64 = ((bytes[0] as u64) << 32)
+            | ((bytes[1] as u64) << 24)
+            | ((bytes[2] as u64) << 16)
+            | ((bytes[3] as u64) << 8)
+            | (bytes[4] as u64);
+        for i in (0..8).rev() {
+            let idx = ((packed >> (i * 5)) & 0x1F) as usize;
+            out.push(BASE32_ALPHABET[idx] as char);
+        }
+        Self(out)
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for SessionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
     }
@@ -260,6 +317,40 @@ impl Interval {
 mod tests {
     use super::*;
     use jiff::{civil::date, tz::TimeZone};
+
+    #[test]
+    fn session_id_accepts_valid() {
+        for ok in ["a3f5k2lm", "22222222", "zzzzzzzz"] {
+            assert!(SessionId::parse(ok).is_ok(), "{ok} should parse");
+        }
+    }
+
+    #[test]
+    fn session_id_normalises_to_lowercase() {
+        let id = SessionId::parse("A3F5K2LM").unwrap();
+        assert_eq!(id.as_str(), "a3f5k2lm");
+    }
+
+    #[test]
+    fn session_id_rejects_wrong_length() {
+        for bad in ["", "abc", "abcdefghi"] {
+            assert!(SessionId::parse(bad).is_err(), "{bad} should be rejected");
+        }
+    }
+
+    #[test]
+    fn session_id_rejects_non_base32() {
+        // Base32 RFC4648 lowercase alphabet is [a-z2-7]; '0', '1', '8', '9' are not allowed.
+        for bad in ["abcdef01", "abcdef89", "abcdef!!"] {
+            assert!(SessionId::parse(bad).is_err(), "{bad} should be rejected");
+        }
+    }
+
+    #[test]
+    fn session_id_generate_is_valid() {
+        let id = SessionId::generate();
+        assert!(SessionId::parse(id.as_str()).is_ok());
+    }
 
     #[test]
     fn accepts_valid_names() {
