@@ -68,7 +68,8 @@ impl FsStore {
             return Err(Error::ProjectNotFound(name.to_string()));
         }
         let bytes = fs::read(&path)?;
-        read_project(name, bytes.as_slice())
+        let (project, _) = read_project(name, bytes.as_slice())?;
+        Ok(project)
     }
 
     fn save_inner(&self, project: &Project) -> Result<()> {
