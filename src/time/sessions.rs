@@ -20,7 +20,7 @@ pub fn sessions_in<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::ProjectName;
+    use crate::model::{ProjectName, SessionId};
     use jiff::{civil::date, tz::TimeZone};
 
     fn z(year: i16, m: i8, d: i8, h: i8, min: i8) -> jiff::Zoned {
@@ -31,6 +31,7 @@ mod tests {
     }
     fn closed(start: jiff::Zoned, stop: jiff::Zoned) -> Session {
         Session {
+            id: SessionId::generate(),
             start,
             stop: Some(stop),
             note: None,
@@ -38,6 +39,7 @@ mod tests {
     }
     fn open(start: jiff::Zoned) -> Session {
         Session {
+            id: SessionId::generate(),
             start,
             stop: None,
             note: None,

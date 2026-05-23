@@ -299,7 +299,7 @@ fn draw_footer(f: &mut Frame, area: Rect, data: &DashboardData) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Project, ProjectName, Session};
+    use crate::model::{Project, ProjectName, Session, SessionId};
     use jiff::{civil::date, tz::TimeZone};
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
@@ -352,6 +352,7 @@ mod tests {
         let projects = vec![Project {
             name: ProjectName::parse("p").unwrap(),
             sessions: vec![Session {
+                id: SessionId::generate(),
                 start: z(9),
                 stop: Some(z(10)),
                 note: None,
@@ -383,11 +384,13 @@ mod tests {
             name: ProjectName::parse("p").unwrap(),
             sessions: vec![
                 Session {
+                    id: SessionId::generate(),
                     start: z(9),
                     stop: Some(z(10)),
                     note: None,
                 },
                 Session {
+                    id: SessionId::generate(),
                     start: z(11),
                     stop: None,
                     note: None,
@@ -439,6 +442,7 @@ mod tests {
             Project {
                 name: ProjectName::parse("b").unwrap(),
                 sessions: vec![Session {
+                    id: SessionId::generate(),
                     start: z(9),
                     stop: Some(z(10)),
                     note: None,
@@ -589,6 +593,7 @@ mod tests {
         let projects = vec![Project {
             name: ProjectName::parse("p").unwrap(),
             sessions: vec![Session {
+                id: SessionId::generate(),
                 start: z(9),
                 stop: Some(z(10)),
                 note: None,
@@ -647,6 +652,7 @@ mod tests {
         let projects = vec![Project {
             name: ProjectName::parse("alpha").unwrap(),
             sessions: vec![Session {
+                id: SessionId::generate(),
                 start: z(9),
                 stop: Some(z(10)),
                 note: None,

@@ -24,7 +24,7 @@ pub trait ProjectStore: Send + Sync {
 pub mod mem {
     use super::*;
     use crate::error::Error;
-    use crate::model::Session;
+    use crate::model::{Session, SessionId};
     use std::collections::BTreeMap;
     use std::sync::Mutex;
 
@@ -95,6 +95,7 @@ pub mod mem {
                 ));
             }
             v.push(Session {
+                id: SessionId::generate(),
                 start: start.clone(),
                 stop: None,
                 note: note.map(str::to_string),

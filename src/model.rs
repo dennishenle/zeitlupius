@@ -113,6 +113,7 @@ impl std::fmt::Display for SessionId {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Session {
+    pub id: SessionId,
     pub start: jiff::Zoned,
     pub stop: Option<jiff::Zoned>,
     pub note: Option<String>,
@@ -404,6 +405,7 @@ mod tests {
     #[test]
     fn session_running_means_no_stop() {
         let s = Session {
+            id: SessionId::generate(),
             start: z(2026, 5, 4, 9, 0),
             stop: None,
             note: None,
@@ -414,6 +416,7 @@ mod tests {
     #[test]
     fn session_duration_uses_now_when_running() {
         let s = Session {
+            id: SessionId::generate(),
             start: z(2026, 5, 4, 9, 0),
             stop: None,
             note: None,
@@ -426,6 +429,7 @@ mod tests {
     #[test]
     fn session_duration_uses_stop_when_closed() {
         let s = Session {
+            id: SessionId::generate(),
             start: z(2026, 5, 4, 9, 0),
             stop: Some(z(2026, 5, 4, 9, 45)),
             note: None,
@@ -441,12 +445,14 @@ mod tests {
             sessions: vec![],
         };
         p.sessions.push(Session {
+            id: SessionId::generate(),
             start: z(2026, 5, 4, 9, 0),
             stop: Some(z(2026, 5, 4, 9, 30)),
             note: None,
         });
         assert!(p.running_session().is_none());
         p.sessions.push(Session {
+            id: SessionId::generate(),
             start: z(2026, 5, 4, 10, 0),
             stop: None,
             note: None,

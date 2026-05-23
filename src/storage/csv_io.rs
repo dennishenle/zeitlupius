@@ -4,7 +4,7 @@ use jiff::Zoned;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
-use crate::model::{Project, ProjectName, Session};
+use crate::model::{Project, ProjectName, Session, SessionId};
 
 #[derive(Serialize, Deserialize)]
 struct Row {
@@ -43,7 +43,7 @@ pub fn read_project<R: Read>(name: &ProjectName, reader: R) -> Result<Project> {
         } else {
             Some(row.note)
         };
-        let session = Session { start, stop, note };
+        let session = Session { id: SessionId::generate(), start, stop, note };
         if let Some(prev) = sessions.last() {
             if session.start < prev.start {
                 return Err(Error::Corrupt(format!(
@@ -112,11 +112,13 @@ mod tests {
             name: pname(),
             sessions: vec![
                 Session {
+                    id: SessionId::generate(),
                     start: z(2026, 5, 4, 9, 0),
                     stop: Some(z(2026, 5, 4, 10, 0)),
                     note: Some("foo".into()),
                 },
                 Session {
+                    id: SessionId::generate(),
                     start: z(2026, 5, 4, 13, 0),
                     stop: None,
                     note: None,
@@ -158,6 +160,7 @@ mod tests {
         let p = Project {
             name: pname(),
             sessions: vec![Session {
+                id: SessionId::generate(),
                 start: z(2026, 5, 4, 9, 0),
                 stop: Some(z(2026, 5, 4, 10, 0)),
                 note: Some("a, b".into()),

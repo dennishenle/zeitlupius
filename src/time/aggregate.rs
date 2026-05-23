@@ -17,7 +17,7 @@ pub fn project_total_in(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{ProjectName, Session};
+    use crate::model::{ProjectName, Session, SessionId};
     use jiff::{civil::date, tz::TimeZone};
 
     fn z(year: i16, m: i8, d: i8, h: i8, min: i8) -> jiff::Zoned {
@@ -33,11 +33,13 @@ mod tests {
             name: ProjectName::parse("p").unwrap(),
             sessions: vec![
                 Session {
+                    id: SessionId::generate(),
                     start: z(2026, 5, 4, 9, 0),
                     stop: Some(z(2026, 5, 4, 10, 0)),
                     note: None,
                 },
                 Session {
+                    id: SessionId::generate(),
                     start: z(2026, 5, 4, 14, 0),
                     stop: Some(z(2026, 5, 4, 15, 30)),
                     note: None,
@@ -58,6 +60,7 @@ mod tests {
         let p = Project {
             name: ProjectName::parse("p").unwrap(),
             sessions: vec![Session {
+                id: SessionId::generate(),
                 start: z(2026, 5, 3, 9, 0),
                 stop: Some(z(2026, 5, 3, 10, 0)),
                 note: None,
