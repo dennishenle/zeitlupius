@@ -3,7 +3,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::error::{Error, Result};
-use crate::model::{Project, ProjectName, Session};
+use crate::model::{Project, ProjectName, Session, SessionId};
 use crate::storage::ProjectStore;
 use crate::storage::csv_io::{read_project, write_project};
 
@@ -146,6 +146,7 @@ impl ProjectStore for FsStore {
                 ));
             }
             p.sessions.push(Session {
+                id: SessionId::generate(),
                 start: start.clone(),
                 stop: None,
                 note: note.map(str::to_string),
