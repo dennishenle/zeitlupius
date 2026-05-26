@@ -64,13 +64,9 @@ fn main() -> ExitCode {
                 let name = zeitlupius::ProjectName::parse(&project)?;
                 let sid = zeitlupius::model::SessionId::parse(&id)?;
                 let sessions = zeitlupius::ops::list_sessions(store_ref, &name)?;
-                let s = sessions
-                    .into_iter()
-                    .find(|s| s.id == sid)
-                    .ok_or(zeitlupius::Error::SessionNotFound(
-                        name.to_string(),
-                        sid.to_string(),
-                    ))?;
+                let s = sessions.into_iter().find(|s| s.id == sid).ok_or(
+                    zeitlupius::Error::SessionNotFound(name.to_string(), sid.to_string()),
+                )?;
                 let stop = s
                     .stop
                     .as_ref()

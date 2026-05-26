@@ -149,5 +149,8 @@ fn legacy_csv_is_migrated_on_session_list() {
         .stdout(predicate::str::contains("\"id\":\""));
 
     let after = std::fs::read_to_string(&legacy_path).unwrap();
-    assert!(after.contains("start,stop,note,id"), "header not rewritten: {after}");
+    assert!(
+        after.contains("start,stop,note,id"),
+        "header not rewritten: {after}"
+    );
 }
