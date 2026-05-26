@@ -56,6 +56,55 @@ fn main() -> ExitCode {
                 Ok(())
             }
         }
+        Some(Command::Session(zeitlupius::cli::SessionCmd::Delete { project, id, force }))
+            if !force =>
+        {
+            let store_ref = &store;
+            let preview = (|| -> Result<String, zeitlupius::Error> {
+                let name = zeitlupius::ProjectName::parse(&project)?;
+                let sid = zeitlupius::model::SessionId::parse(&id)?;
+                let sessions = zeitlupius::ops::list_sessions(store_ref, &name)?;
+                let s = sessions
+                    .into_iter()
+                    .find(|s| s.id == sid)
+                    .ok_or(zeitlupius::Error::SessionNotFound(
+                        name.to_string(),
+                        sid.to_string(),
+                    ))?;
+                let stop = s
+                    .stop
+                    .as_ref()
+                    .map(|z| z.to_string())
+                    .unwrap_or_else(|| "running".into());
+                Ok(format!("{} → {}", s.start, stop))
+            })();
+
+            match preview {
+                Ok(line) => {
+                    print!("Delete session {id} of '{project}' ({line})? [y/N] ");
+                    io::stdout().flush().ok();
+                    let mut ans = String::new();
+                    io::stdin().read_line(&mut ans).ok();
+                    if ans.trim().eq_ignore_ascii_case("y") {
+                        run_cli(
+                            &store,
+                            Command::Session(zeitlupius::cli::SessionCmd::Delete {
+                                project,
+                                id,
+                                force: true,
+                            }),
+                            &mut io::stdout(),
+                            &now,
+                            &tz,
+                        )
+                    } else {
+                        println!("aborted");
+                        Ok(())
+                    }
+                }
+                Err(e) => Err(e),
+            }
+        }
         Some(cmd) => run_cli(&store, cmd, &mut io::stdout(), &now, &tz),
     };
 
