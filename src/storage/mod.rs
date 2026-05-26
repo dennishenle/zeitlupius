@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::model::{Project, ProjectName};
+use crate::model::{Project, ProjectName, Session, SessionId};
 
 pub mod csv_io;
 pub mod fs_store;
@@ -18,6 +18,7 @@ pub trait ProjectStore: Send + Sync {
         note: Option<&str>,
     ) -> Result<()>;
     fn close_open(&self, name: &ProjectName, stop: &jiff::Zoned) -> Result<()>;
+    fn delete_session(&self, name: &ProjectName, id: &SessionId) -> Result<Session>;
 }
 
 #[cfg(test)]
@@ -116,6 +117,17 @@ pub mod mem {
             last.stop = Some(stop.clone());
             Ok(())
         }
+        fn delete_session(&self, name: &ProjectName, id: &SessionId) -> Result<Session> {
+            let mut g = self.inner.lock().unwrap();
+            let v = g
+                .get_mut(name.as_str())
+                .ok_or_else(|| Error::ProjectNotFound(name.to_string()))?;
+            let pos = v
+                .iter()
+                .position(|s| s.id == *id)
+                .ok_or_else(|| Error::SessionNotFound(name.to_string(), id.to_string()))?;
+            Ok(v.remove(pos))
+        }
     }
 
     #[cfg(test)]
@@ -178,6 +190,36 @@ pub mod mem {
                 .unwrap();
             let err = s.close_open(&n, &t).unwrap_err();
             assert!(matches!(err, Error::NotRunning(_)));
+        }
+
+        #[test]
+        fn delete_session_removes_only_the_target() {
+            let s = MemStore::new();
+            let n = ProjectName::parse("p").unwrap();
+            s.create(&n).unwrap();
+            let t0 = date(2026, 5, 4).at(9, 0, 0, 0).to_zoned(TimeZone::UTC).unwrap();
+            let t1 = date(2026, 5, 4).at(10, 0, 0, 0).to_zoned(TimeZone::UTC).unwrap();
+            let t2 = date(2026, 5, 4).at(11, 0, 0, 0).to_zoned(TimeZone::UTC).unwrap();
+            s.append_start(&n, &t0, None).unwrap();
+            s.close_open(&n, &t1).unwrap();
+            s.append_start(&n, &t2, None).unwrap();
+            let p = s.load(&n).unwrap();
+            let target = p.sessions[0].id.clone();
+            let removed = s.delete_session(&n, &target).unwrap();
+            assert_eq!(removed.id, target);
+            let p2 = s.load(&n).unwrap();
+            assert_eq!(p2.sessions.len(), 1);
+            assert!(p2.sessions[0].is_running(), "remaining session must still be open");
+        }
+
+        #[test]
+        fn delete_session_unknown_id_errors() {
+            let s = MemStore::new();
+            let n = ProjectName::parse("p").unwrap();
+            s.create(&n).unwrap();
+            let id = SessionId::parse("aaaaaaaa").unwrap();
+            let err = s.delete_session(&n, &id).unwrap_err();
+            assert!(matches!(err, Error::SessionNotFound(_, _)));
         }
     }
 }
