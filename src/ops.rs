@@ -13,6 +13,21 @@ pub fn delete<S: ProjectStore>(store: &S, name: &ProjectName) -> Result<()> {
     store.delete(name)
 }
 
+pub fn list_sessions<S: ProjectStore>(
+    store: &S,
+    name: &ProjectName,
+) -> Result<Vec<crate::model::Session>> {
+    Ok(store.load(name)?.sessions)
+}
+
+pub fn delete_session<S: ProjectStore>(
+    store: &S,
+    name: &ProjectName,
+    id: &crate::model::SessionId,
+) -> Result<crate::model::Session> {
+    store.delete_session(name, id)
+}
+
 pub fn list<S: ProjectStore>(store: &S) -> Result<Vec<ProjectName>> {
     store.list()
 }
@@ -154,5 +169,32 @@ mod tests {
         assert_eq!(st.len(), 1);
         assert_eq!(st[0].name.as_str(), "a");
         assert_eq!(st[0].running_seconds, 1800);
+    }
+
+    #[test]
+    fn list_sessions_returns_in_storage_order() {
+        let s = MemStore::new();
+        let n = ProjectName::parse("p").unwrap();
+        create(&s, &n).unwrap();
+        start(&s, &n, &z(9, 0), None).unwrap();
+        stop(&s, &n, &z(10, 0)).unwrap();
+        start(&s, &n, &z(11, 0), None).unwrap();
+        let sessions = list_sessions(&s, &n).unwrap();
+        assert_eq!(sessions.len(), 2);
+        assert!(sessions[0].stop.is_some());
+        assert!(sessions[1].stop.is_none());
+    }
+
+    #[test]
+    fn delete_session_returns_the_removed_row() {
+        let s = MemStore::new();
+        let n = ProjectName::parse("p").unwrap();
+        create(&s, &n).unwrap();
+        start(&s, &n, &z(9, 0), None).unwrap();
+        stop(&s, &n, &z(10, 0)).unwrap();
+        let id = list_sessions(&s, &n).unwrap()[0].id.clone();
+        let removed = delete_session(&s, &n, &id).unwrap();
+        assert_eq!(removed.id, id);
+        assert!(list_sessions(&s, &n).unwrap().is_empty());
     }
 }
