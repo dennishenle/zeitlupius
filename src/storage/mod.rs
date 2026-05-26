@@ -95,8 +95,18 @@ pub mod mem {
                     last.start.to_string(),
                 ));
             }
+            let mut id = SessionId::generate();
+            for _ in 0..5 {
+                if !v.iter().any(|s| s.id == id) {
+                    break;
+                }
+                id = SessionId::generate();
+            }
+            if v.iter().any(|s| s.id == id) {
+                return Err(Error::Corrupt("session id collision after 5 retries".into()));
+            }
             v.push(Session {
-                id: SessionId::generate(),
+                id,
                 start: start.clone(),
                 stop: None,
                 note: note.map(str::to_string),
@@ -190,6 +200,22 @@ pub mod mem {
                 .unwrap();
             let err = s.close_open(&n, &t).unwrap_err();
             assert!(matches!(err, Error::NotRunning(_)));
+        }
+
+        #[test]
+        fn append_start_records_unique_id() {
+            let s = MemStore::new();
+            let n = ProjectName::parse("p").unwrap();
+            s.create(&n).unwrap();
+            let t0 = date(2026, 5, 4).at(9, 0, 0, 0).to_zoned(TimeZone::UTC).unwrap();
+            let t1 = date(2026, 5, 4).at(10, 0, 0, 0).to_zoned(TimeZone::UTC).unwrap();
+            let t2 = date(2026, 5, 4).at(11, 0, 0, 0).to_zoned(TimeZone::UTC).unwrap();
+            s.append_start(&n, &t0, None).unwrap();
+            s.close_open(&n, &t1).unwrap();
+            s.append_start(&n, &t2, None).unwrap();
+            let p = s.load(&n).unwrap();
+            assert_eq!(p.sessions.len(), 2);
+            assert_ne!(p.sessions[0].id, p.sessions[1].id);
         }
 
         #[test]
