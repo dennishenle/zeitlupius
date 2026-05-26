@@ -37,6 +37,8 @@ pub enum Command {
     Status {
         project: Option<String>,
     },
+    #[command(subcommand)]
+    Session(SessionCmd),
     Report(ReportArgs),
 }
 
@@ -68,6 +70,21 @@ pub struct IntervalArgs {
     pub from: Option<String>,
     #[arg(long, value_name = "DD.MM.YYYY", requires = "from")]
     pub to: Option<String>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum SessionCmd {
+    List {
+        project: String,
+        #[arg(long)]
+        json: bool,
+    },
+    Delete {
+        project: String,
+        id: String,
+        #[arg(long, short = 'f')]
+        force: bool,
+    },
 }
 
 #[cfg(test)]
@@ -128,5 +145,38 @@ mod tests {
     fn no_subcommand_means_tui() {
         let cli = Cli::try_parse_from(["zeitlupius"]).unwrap();
         assert!(cli.command.is_none());
+    }
+
+    #[test]
+    fn parses_session_list() {
+        let cli = Cli::try_parse_from(["zeitlupius", "session", "list", "p"]).unwrap();
+        match cli.command {
+            Some(Command::Session(SessionCmd::List { project, json })) => {
+                assert_eq!(project, "p");
+                assert!(!json);
+            }
+            _ => panic!("wrong subcommand"),
+        }
+    }
+
+    #[test]
+    fn parses_session_delete_force() {
+        let cli = Cli::try_parse_from([
+            "zeitlupius",
+            "session",
+            "delete",
+            "p",
+            "abcdef23",
+            "--force",
+        ])
+        .unwrap();
+        match cli.command {
+            Some(Command::Session(SessionCmd::Delete { project, id, force })) => {
+                assert_eq!(project, "p");
+                assert_eq!(id, "abcdef23");
+                assert!(force);
+            }
+            _ => panic!("wrong subcommand"),
+        }
     }
 }

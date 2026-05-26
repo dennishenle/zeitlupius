@@ -5,7 +5,7 @@ use getrandom;
 pub struct ProjectName(String);
 
 const RESERVED: &[&str] = &[
-    "list", "start", "stop", "status", "create", "delete", "report",
+    "list", "start", "stop", "status", "create", "delete", "report", "session",
 ];
 const MAX_LEN: usize = 64;
 
@@ -382,10 +382,15 @@ mod tests {
     #[test]
     fn rejects_reserved_verbs() {
         for v in [
-            "list", "start", "stop", "status", "create", "delete", "report",
+            "list", "start", "stop", "status", "create", "delete", "report", "session",
         ] {
             assert!(ProjectName::parse(v).is_err(), "{v} should be reserved");
         }
+    }
+
+    #[test]
+    fn rejects_session_as_project_name() {
+        assert!(ProjectName::parse("session").is_err());
     }
 
     #[test]

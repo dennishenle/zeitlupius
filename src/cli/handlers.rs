@@ -60,6 +60,7 @@ pub fn run<S: ProjectStore, W: Write>(
             Ok(())
         }
         Command::Report(args) => report(store, args, out, now, tz),
+        Command::Session(_) => unimplemented!("session handler — added in next task"),
     }
 }
 
