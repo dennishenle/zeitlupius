@@ -163,7 +163,9 @@ impl ProjectStore for FsStore {
                 id = SessionId::generate();
             }
             if p.sessions.iter().any(|s| s.id == id) {
-                return Err(Error::Corrupt("session id collision after 5 retries".into()));
+                return Err(Error::Corrupt(
+                    "session id collision after 5 retries".into(),
+                ));
             }
             p.sessions.push(Session {
                 id,
@@ -291,7 +293,10 @@ mod tests {
 
         // Second load reads the persisted id (no further migration).
         let p2 = s.load(&ProjectName::parse("p").unwrap()).unwrap();
-        assert_eq!(p2.sessions[0].id, p.sessions[0].id, "id changed across loads");
+        assert_eq!(
+            p2.sessions[0].id, p.sessions[0].id,
+            "id changed across loads"
+        );
     }
 
     #[test]

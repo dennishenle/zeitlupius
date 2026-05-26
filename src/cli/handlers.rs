@@ -181,7 +181,10 @@ fn session<S: ProjectStore, W: Write>(
                 }
                 writeln!(out, "]")?;
             } else {
-                writeln!(out, "ID        START                  STOP                   DURATION  NOTE")?;
+                writeln!(
+                    out,
+                    "ID        START                  STOP                   DURATION  NOTE"
+                )?;
                 for s in &sessions {
                     let stop = s
                         .stop
@@ -205,7 +208,11 @@ fn session<S: ProjectStore, W: Write>(
             }
             Ok(())
         }
-        SessionCmd::Delete { project, id, force: _ } => {
+        SessionCmd::Delete {
+            project,
+            id,
+            force: _,
+        } => {
             let name = ProjectName::parse(&project)?;
             let sid = SessionId::parse(&id)?;
             let removed = ops::delete_session(store, &name, &sid)?;
@@ -484,8 +491,16 @@ mod tests {
     fn session_list_shows_id_and_duration() {
         let s = MemStore::new();
         let mut sink = Vec::new();
-        run(&s, Command::Create { project: "p".into() }, &mut sink, &z(8), &TimeZone::UTC)
-            .unwrap();
+        run(
+            &s,
+            Command::Create {
+                project: "p".into(),
+            },
+            &mut sink,
+            &z(8),
+            &TimeZone::UTC,
+        )
+        .unwrap();
         run(
             &s,
             Command::Start {
@@ -529,8 +544,16 @@ mod tests {
     fn session_list_json_is_an_array() {
         let s = MemStore::new();
         let mut sink = Vec::new();
-        run(&s, Command::Create { project: "p".into() }, &mut sink, &z(8), &TimeZone::UTC)
-            .unwrap();
+        run(
+            &s,
+            Command::Create {
+                project: "p".into(),
+            },
+            &mut sink,
+            &z(8),
+            &TimeZone::UTC,
+        )
+        .unwrap();
         run(
             &s,
             Command::Start {
