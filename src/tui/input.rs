@@ -52,12 +52,24 @@ fn dispatch_dashboard(key: KeyEvent, state: &mut AppState, today: jiff::civil::D
             state.modal = Modal::Help;
             Action::None
         }
+        KeyCode::Tab => {
+            state.toggle_focus();
+            Action::None
+        }
         KeyCode::Char('j') | KeyCode::Down => {
-            state.move_down();
+            use crate::tui::app::Focus;
+            match state.focus {
+                Focus::Projects => state.move_down(),
+                Focus::Sessions => state.move_session_down(),
+            }
             Action::None
         }
         KeyCode::Char('k') | KeyCode::Up => {
-            state.move_up();
+            use crate::tui::app::Focus;
+            match state.focus {
+                Focus::Projects => state.move_up(),
+                Focus::Sessions => state.move_session_up(),
+            }
             Action::None
         }
         KeyCode::Char('d') => {
@@ -286,5 +298,38 @@ mod tests {
             crate::model::Interval::Day(d) => assert_eq!(d, date(2026, 5, 3)),
             _ => panic!(),
         }
+    }
+
+    use crate::tui::app::Focus;
+
+    #[test]
+    fn tab_toggles_focus_outside_modals() {
+        let mut s = AppState::new(date(2026, 5, 4), names(&["a"]));
+        dispatch(key(KeyCode::Tab), &mut s, date(2026, 5, 4));
+        assert_eq!(s.focus, Focus::Sessions);
+        dispatch(key(KeyCode::Tab), &mut s, date(2026, 5, 4));
+        assert_eq!(s.focus, Focus::Projects);
+    }
+
+    #[test]
+    fn jk_routes_to_sessions_when_focused() {
+        let mut s = AppState::new(date(2026, 5, 4), names(&["a"]));
+        s.focus = Focus::Sessions;
+        s.sessions_visible = vec![
+            crate::model::SessionId::parse("aaaaaaaa").unwrap(),
+            crate::model::SessionId::parse("bbbbbbbb").unwrap(),
+        ];
+        dispatch(key(KeyCode::Char('j')), &mut s, date(2026, 5, 4));
+        assert_eq!(s.session_selected, 1);
+        assert_eq!(s.selected, 0, "project cursor must not move");
+    }
+
+    #[test]
+    fn d_in_sessions_focus_opens_session_delete_modal() {
+        use crate::tui::app::Modal;
+        let mut s = AppState::new(date(2026, 5, 4), names(&["a"]));
+        s.focus = Focus::Sessions;
+        let act = dispatch(key(KeyCode::Char('D')), &mut s, date(2026, 5, 4));
+        assert!(matches!(act, Action::DeleteSelected));
     }
 }
