@@ -62,14 +62,16 @@ impl FsStore {
         Ok(())
     }
 
-    fn load_inner(&self, name: &ProjectName) -> Result<Project> {
+    fn load_inner(
+        &self,
+        name: &ProjectName,
+    ) -> Result<(Project, crate::storage::csv_io::Migrated)> {
         let path = self.project_path(name);
         if !path.exists() {
             return Err(Error::ProjectNotFound(name.to_string()));
         }
         let bytes = fs::read(&path)?;
-        let (project, _) = read_project(name, bytes.as_slice())?;
-        Ok(project)
+        read_project(name, bytes.as_slice())
     }
 
     fn save_inner(&self, project: &Project) -> Result<()> {
@@ -102,8 +104,15 @@ impl ProjectStore for FsStore {
     }
 
     fn load(&self, name: &ProjectName) -> Result<Project> {
-        self.ensure_dirs()?;
-        self.load_inner(name)
+        self.with_lock(|| {
+            let (project, migrated) = self.load_inner(name)?;
+            if matches!(migrated, crate::storage::csv_io::Migrated::Yes) {
+                // Rewrite to persist generated IDs. Best-effort: on failure we still
+                // return the in-memory project so callers can proceed.
+                let _ = self.save_inner(&project);
+            }
+            Ok(project)
+        })
     }
 
     fn create(&self, name: &ProjectName) -> Result<()> {
@@ -137,7 +146,7 @@ impl ProjectStore for FsStore {
         note: Option<&str>,
     ) -> Result<()> {
         self.with_lock(|| {
-            let mut p = self.load_inner(name)?;
+            let (mut p, _) = self.load_inner(name)?;
             if let Some(last) = p.sessions.last()
                 && last.is_running()
             {
@@ -158,7 +167,7 @@ impl ProjectStore for FsStore {
 
     fn close_open(&self, name: &ProjectName, stop: &jiff::Zoned) -> Result<()> {
         self.with_lock(|| {
-            let mut p = self.load_inner(name)?;
+            let (mut p, _) = self.load_inner(name)?;
             let Some(last) = p.sessions.last_mut() else {
                 return Err(Error::NotRunning(name.to_string()));
             };
@@ -236,6 +245,29 @@ mod tests {
             s.create(&n).unwrap_err(),
             Error::ProjectAlreadyExists(_)
         ));
+    }
+
+    #[test]
+    fn legacy_file_is_rewritten_on_first_load() {
+        let (_td, s) = store();
+        s.ensure_dirs().unwrap();
+        let path = s.project_path(&ProjectName::parse("p").unwrap());
+        let legacy = "start,stop,note\n2026-05-04T09:00:00+00:00[UTC],2026-05-04T10:00:00+00:00[UTC],morning\n";
+        std::fs::write(&path, legacy).unwrap();
+
+        let p = s.load(&ProjectName::parse("p").unwrap()).unwrap();
+        assert_eq!(p.sessions.len(), 1);
+
+        // File on disk now has the `id` column.
+        let after = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            after.contains("start,stop,note,id"),
+            "header was not rewritten: {after}"
+        );
+
+        // Second load reads the persisted id (no further migration).
+        let p2 = s.load(&ProjectName::parse("p").unwrap()).unwrap();
+        assert_eq!(p2.sessions[0].id, p.sessions[0].id, "id changed across loads");
     }
 
     #[test]
