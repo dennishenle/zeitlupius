@@ -326,7 +326,6 @@ mod tests {
 
     #[test]
     fn d_in_sessions_focus_opens_session_delete_modal() {
-        use crate::tui::app::Modal;
         let mut s = AppState::new(date(2026, 5, 4), names(&["a"]));
         s.focus = Focus::Sessions;
         let act = dispatch(key(KeyCode::Char('D')), &mut s, date(2026, 5, 4));
