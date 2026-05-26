@@ -60,7 +60,7 @@ pub fn run<S: ProjectStore, W: Write>(
             Ok(())
         }
         Command::Report(args) => report(store, args, out, now, tz),
-        Command::Session(_) => unimplemented!("session handler — added in next task"),
+        Command::Session(sub) => session(store, sub, out),
     }
 }
 
@@ -144,6 +144,94 @@ fn report<S: ProjectStore, W: Write>(
     Ok(())
 }
 
+fn session<S: ProjectStore, W: Write>(
+    store: &S,
+    sub: crate::cli::SessionCmd,
+    out: &mut W,
+) -> Result<()> {
+    use crate::cli::SessionCmd;
+    use crate::model::SessionId;
+    match sub {
+        SessionCmd::List { project, json } => {
+            let name = ProjectName::parse(&project)?;
+            let sessions = ops::list_sessions(store, &name)?;
+            if json {
+                write!(out, "[")?;
+                for (i, s) in sessions.iter().enumerate() {
+                    if i > 0 {
+                        write!(out, ",")?;
+                    }
+                    let stop_json = match &s.stop {
+                        Some(z) => format!("\"{z}\""),
+                        None => "null".into(),
+                    };
+                    let dur = match &s.stop {
+                        Some(z) => z.timestamp().as_second() - s.start.timestamp().as_second(),
+                        None => 0,
+                    };
+                    let note_json = match &s.note {
+                        Some(n) => format!("\"{}\"", n.replace('\\', "\\\\").replace('"', "\\\"")),
+                        None => "null".into(),
+                    };
+                    write!(
+                        out,
+                        "{{\"id\":\"{}\",\"start\":\"{}\",\"stop\":{},\"duration_seconds\":{},\"note\":{}}}",
+                        s.id, s.start, stop_json, dur, note_json
+                    )?;
+                }
+                writeln!(out, "]")?;
+            } else {
+                writeln!(out, "ID        START                  STOP                   DURATION  NOTE")?;
+                for s in &sessions {
+                    let stop = s
+                        .stop
+                        .as_ref()
+                        .map(|z| z.strftime("%d.%m.%Y %H:%M:%S").to_string())
+                        .unwrap_or_else(|| "running                ".to_string());
+                    let dur_secs = match &s.stop {
+                        Some(z) => z.timestamp().as_second() - s.start.timestamp().as_second(),
+                        None => 0,
+                    };
+                    writeln!(
+                        out,
+                        "{}  {}    {}    {}  {}",
+                        s.id,
+                        s.start.strftime("%d.%m.%Y %H:%M:%S"),
+                        stop,
+                        fmt_hms(dur_secs),
+                        s.note.as_deref().unwrap_or(""),
+                    )?;
+                }
+            }
+            Ok(())
+        }
+        SessionCmd::Delete { project, id, force: _ } => {
+            let name = ProjectName::parse(&project)?;
+            let sid = SessionId::parse(&id)?;
+            let removed = ops::delete_session(store, &name, &sid)?;
+            let stop = removed
+                .stop
+                .as_ref()
+                .map(|z| z.to_string())
+                .unwrap_or_else(|| "running".into());
+            let dur = match &removed.stop {
+                Some(z) => z.timestamp().as_second() - removed.start.timestamp().as_second(),
+                None => 0,
+            };
+            writeln!(
+                out,
+                "deleted {} from '{}' ({} → {}, {})",
+                removed.id,
+                name,
+                removed.start,
+                stop,
+                fmt_hms(dur)
+            )?;
+            Ok(())
+        }
+    }
+}
+
 fn build_interval(args: &IntervalArgs, page: i32, now: &jiff::Zoned) -> Result<Interval> {
     let today = now.date();
     if let (Some(f), Some(t)) = (args.from.as_deref(), args.to.as_deref()) {
@@ -192,6 +280,7 @@ fn parse_date(s: &str) -> Result<jiff::civil::Date> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cli::SessionCmd;
     use crate::storage::mem::MemStore;
     use jiff::{civil::date, tz::TimeZone};
 
@@ -389,5 +478,98 @@ mod tests {
         assert!(parse_date("nope").is_err());
         assert!(parse_date("31.02.2026").is_err());
         assert_eq!(parse_date("18.04.2024").unwrap().day(), 18);
+    }
+
+    #[test]
+    fn session_list_shows_id_and_duration() {
+        let s = MemStore::new();
+        let mut sink = Vec::new();
+        run(&s, Command::Create { project: "p".into() }, &mut sink, &z(8), &TimeZone::UTC)
+            .unwrap();
+        run(
+            &s,
+            Command::Start {
+                project: "p".into(),
+                note: None,
+            },
+            &mut sink,
+            &z(9),
+            &TimeZone::UTC,
+        )
+        .unwrap();
+        run(
+            &s,
+            Command::Stop {
+                project: "p".into(),
+            },
+            &mut sink,
+            &z(10),
+            &TimeZone::UTC,
+        )
+        .unwrap();
+
+        let mut buf = Vec::new();
+        run(
+            &s,
+            Command::Session(SessionCmd::List {
+                project: "p".into(),
+                json: false,
+            }),
+            &mut buf,
+            &z(23),
+            &TimeZone::UTC,
+        )
+        .unwrap();
+        let txt = String::from_utf8(buf).unwrap();
+        assert!(txt.contains("ID"), "header missing: {txt}");
+        assert!(txt.contains("1:00:00"), "duration missing: {txt}");
+    }
+
+    #[test]
+    fn session_list_json_is_an_array() {
+        let s = MemStore::new();
+        let mut sink = Vec::new();
+        run(&s, Command::Create { project: "p".into() }, &mut sink, &z(8), &TimeZone::UTC)
+            .unwrap();
+        run(
+            &s,
+            Command::Start {
+                project: "p".into(),
+                note: None,
+            },
+            &mut sink,
+            &z(9),
+            &TimeZone::UTC,
+        )
+        .unwrap();
+        run(
+            &s,
+            Command::Stop {
+                project: "p".into(),
+            },
+            &mut sink,
+            &z(10),
+            &TimeZone::UTC,
+        )
+        .unwrap();
+
+        let mut buf = Vec::new();
+        run(
+            &s,
+            Command::Session(SessionCmd::List {
+                project: "p".into(),
+                json: true,
+            }),
+            &mut buf,
+            &z(23),
+            &TimeZone::UTC,
+        )
+        .unwrap();
+        let txt = String::from_utf8(buf).unwrap();
+        assert!(txt.starts_with('['), "json must be an array: {txt}");
+        assert!(
+            txt.contains("\"duration_seconds\":3600"),
+            "json missing duration: {txt}"
+        );
     }
 }
