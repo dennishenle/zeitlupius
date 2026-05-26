@@ -19,6 +19,10 @@ pub fn dispatch(key: KeyEvent, state: &mut AppState, today: jiff::civil::Date) -
         Modal::None => dispatch_dashboard(key, state, today),
         Modal::NewProject { input } => dispatch_new_project(key, input, state),
         Modal::ConfirmDelete { .. } => dispatch_confirm_delete(key, state),
+        Modal::ConfirmDeleteSession { .. } => {
+            state.modal = Modal::None;
+            Action::None
+        }
         Modal::CustomInterval {
             from, to, focus_to, ..
         } => dispatch_custom(key, from, to, focus_to, state),

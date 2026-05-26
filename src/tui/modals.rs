@@ -89,6 +89,9 @@ pub fn draw(f: &mut Frame, area: Rect, modal: &Modal) {
                 popup,
             );
         }
+        Modal::ConfirmDeleteSession { .. } => {
+            // Rendering is implemented in Task 15.
+        }
         Modal::Help => {
             let lines = vec![
                 Line::from("Keys"),
