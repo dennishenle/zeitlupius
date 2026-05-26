@@ -14,6 +14,8 @@ pub enum Error {
     AlreadyRunning(String, String),
     #[error("project '{0}' is not running")]
     NotRunning(String),
+    #[error("project '{0}' has no session with id '{1}'")]
+    SessionNotFound(String, String),
     #[error("invalid date '{0}': expected DD.MM.YYYY")]
     InvalidDate(String),
     #[error("invalid range: {from} is after {to}")]
@@ -43,6 +45,7 @@ impl Error {
             | Error::InvalidSessionId(_, _)
             | Error::AlreadyRunning(_, _)
             | Error::NotRunning(_)
+            | Error::SessionNotFound(_, _)
             | Error::InvalidDate(_)
             | Error::InvalidRange { .. } => ErrorKind::User,
             Error::Corrupt(_) | Error::Io(_) | Error::Csv(_) => ErrorKind::Internal,

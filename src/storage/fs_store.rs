@@ -178,6 +178,20 @@ impl ProjectStore for FsStore {
             self.save_inner(&p)
         })
     }
+
+    fn delete_session(&self, name: &ProjectName, id: &SessionId) -> Result<Session> {
+        self.with_lock(|| {
+            let (mut p, _) = self.load_inner(name)?;
+            let pos = p
+                .sessions
+                .iter()
+                .position(|s| s.id == *id)
+                .ok_or_else(|| Error::SessionNotFound(name.to_string(), id.to_string()))?;
+            let removed = p.sessions.remove(pos);
+            self.save_inner(&p)?;
+            Ok(removed)
+        })
+    }
 }
 
 #[cfg(test)]
@@ -268,6 +282,22 @@ mod tests {
         // Second load reads the persisted id (no further migration).
         let p2 = s.load(&ProjectName::parse("p").unwrap()).unwrap();
         assert_eq!(p2.sessions[0].id, p.sessions[0].id, "id changed across loads");
+    }
+
+    #[test]
+    fn delete_session_persists_to_disk() {
+        let (_td, s) = store();
+        let n = ProjectName::parse("p").unwrap();
+        s.create(&n).unwrap();
+        s.append_start(&n, &z(9, 0), None).unwrap();
+        s.close_open(&n, &z(10, 0)).unwrap();
+        s.append_start(&n, &z(11, 0), None).unwrap();
+        let p = s.load(&n).unwrap();
+        let id = p.sessions[0].id.clone();
+        s.delete_session(&n, &id).unwrap();
+        let p2 = s.load(&n).unwrap();
+        assert_eq!(p2.sessions.len(), 1);
+        assert!(p2.sessions[0].is_running());
     }
 
     #[test]
