@@ -69,9 +69,8 @@ pub fn read_project<R: Read>(name: &ProjectName, reader: R) -> Result<(Project, 
                     i + 2
                 )));
             }
-            SessionId::parse(&row.id).map_err(|e| {
-                Error::Corrupt(format!("project '{name}' row {}: {e}", i + 2))
-            })?
+            SessionId::parse(&row.id)
+                .map_err(|e| Error::Corrupt(format!("project '{name}' row {}: {e}", i + 2)))?
         } else {
             migrated = Migrated::Yes;
             SessionId::generate()
@@ -82,7 +81,12 @@ pub fn read_project<R: Read>(name: &ProjectName, reader: R) -> Result<(Project, 
                 i + 2
             )));
         }
-        let session = Session { id, start, stop, note };
+        let session = Session {
+            id,
+            start,
+            stop,
+            note,
+        };
         if let Some(prev) = sessions.last() {
             if session.start < prev.start {
                 return Err(Error::Corrupt(format!(
@@ -236,7 +240,8 @@ mod tests {
 
     #[test]
     fn legacy_csv_without_id_is_migrated() {
-        let csv = "start,stop,note\n2026-05-04T09:00:00+00:00[UTC],2026-05-04T10:00:00+00:00[UTC],\n";
+        let csv =
+            "start,stop,note\n2026-05-04T09:00:00+00:00[UTC],2026-05-04T10:00:00+00:00[UTC],\n";
         let (p, migrated) = read_project(&pname(), csv.as_bytes()).unwrap();
         assert_eq!(p.sessions.len(), 1);
         assert!(matches!(migrated, Migrated::Yes));
@@ -259,5 +264,4 @@ mod tests {
         let err = read_project(&pname(), csv.as_bytes()).unwrap_err();
         assert!(matches!(err, Error::Corrupt(_)));
     }
-
 }

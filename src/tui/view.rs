@@ -31,10 +31,8 @@ fn right_aligned_row(
     // Fits with at least one filler space.
     if left_width + 1 + right_width <= target {
         let filler = " ".repeat(target - left_width - right_width);
-        let mut spans: Vec<Span<'static>> = left
-            .into_iter()
-            .map(|(t, s)| Span::styled(t, s))
-            .collect();
+        let mut spans: Vec<Span<'static>> =
+            left.into_iter().map(|(t, s)| Span::styled(t, s)).collect();
         spans.push(Span::raw(filler));
         spans.push(Span::styled(right.0, right.1));
         return Line::from(spans);
@@ -486,12 +484,12 @@ mod tests {
             ("world".to_string(), Style::default()),
             20,
         );
-        let rendered: String = line
-            .spans
-            .iter()
-            .map(|s| s.content.as_ref())
-            .collect();
-        assert_eq!(rendered.chars().count(), 20, "row should fill exactly target");
+        let rendered: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(
+            rendered.chars().count(),
+            20,
+            "row should fill exactly target"
+        );
         assert!(rendered.starts_with("hello"));
         assert!(rendered.ends_with("world"));
     }
@@ -503,12 +501,12 @@ mod tests {
             ("1:23".to_string(), Style::default()),
             10,
         );
-        let rendered: String = line
-            .spans
-            .iter()
-            .map(|s| s.content.as_ref())
-            .collect();
-        assert_eq!(rendered.chars().count(), 10, "row should fill exactly target");
+        let rendered: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(
+            rendered.chars().count(),
+            10,
+            "row should fill exactly target"
+        );
         assert!(rendered.contains('…'), "truncation marker expected");
         assert!(rendered.ends_with("1:23"), "right value must be intact");
     }
@@ -523,11 +521,7 @@ mod tests {
             ("1:23".to_string(), Style::default()),
             12,
         );
-        let rendered: String = line
-            .spans
-            .iter()
-            .map(|s| s.content.as_ref())
-            .collect();
+        let rendered: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
         assert_eq!(rendered.chars().count(), 12);
         assert!(rendered.starts_with("● "), "indicator must be preserved");
         assert!(rendered.contains('…'));
@@ -542,11 +536,7 @@ mod tests {
             ("1:23".to_string(), Style::default()),
             3,
         );
-        let rendered: String = line
-            .spans
-            .iter()
-            .map(|s| s.content.as_ref())
-            .collect();
+        let rendered: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
         assert!(rendered.ends_with("1:23"));
     }
 
@@ -562,12 +552,12 @@ mod tests {
             ("CC".to_string(), Style::default()),
             6,
         );
-        let rendered: String = line
-            .spans
-            .iter()
-            .map(|s| s.content.as_ref())
-            .collect();
-        assert_eq!(rendered.chars().count(), 6, "row should fill exactly target");
+        let rendered: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(
+            rendered.chars().count(),
+            6,
+            "row should fill exactly target"
+        );
         assert!(rendered.ends_with("CC"));
         assert!(rendered.contains('…'));
     }
