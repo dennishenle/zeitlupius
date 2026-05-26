@@ -155,8 +155,18 @@ impl ProjectStore for FsStore {
                     last.start.to_string(),
                 ));
             }
+            let mut id = SessionId::generate();
+            for _ in 0..5 {
+                if !p.sessions.iter().any(|s| s.id == id) {
+                    break;
+                }
+                id = SessionId::generate();
+            }
+            if p.sessions.iter().any(|s| s.id == id) {
+                return Err(Error::Corrupt("session id collision after 5 retries".into()));
+            }
             p.sessions.push(Session {
-                id: SessionId::generate(),
+                id,
                 start: start.clone(),
                 stop: None,
                 note: note.map(str::to_string),
