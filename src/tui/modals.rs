@@ -89,8 +89,37 @@ pub fn draw(f: &mut Frame, area: Rect, modal: &Modal) {
                 popup,
             );
         }
-        Modal::ConfirmDeleteSession { .. } => {
-            // Rendering is implemented in Task 15.
+        Modal::ConfirmDeleteSession {
+            session_id,
+            start,
+            stop,
+            duration_seconds,
+            ..
+        } => {
+            let stop_str = match stop {
+                Some(z) => z.strftime("%d.%m.%Y %H:%M:%S").to_string(),
+                None => "running".into(),
+            };
+            let lines = vec![
+                Line::from(format!("Delete session {session_id}?")),
+                Line::from(""),
+                Line::from(format!(
+                    "{}  →  {}",
+                    start.strftime("%d.%m.%Y %H:%M:%S"),
+                    stop_str
+                )),
+                Line::from(format!("Duration: {}", crate::cli::format::fmt_hms(*duration_seconds))),
+                Line::from(""),
+                Line::from("y to confirm · N/Esc to cancel"),
+            ];
+            f.render_widget(
+                Paragraph::new(lines).block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Confirm delete session"),
+                ),
+                popup,
+            );
         }
         Modal::Help => {
             let lines = vec![
