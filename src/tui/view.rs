@@ -216,11 +216,9 @@ fn draw_sessions_panel(f: &mut Frame, area: Rect, data: &DashboardData) {
 
     let focused = data.state.focus == Focus::Sessions;
     let mut block = Block::default().borders(Borders::ALL).title("Sessions");
-    if focused {
-        block = block.border_style(Style::default().fg(Color::Green));
-    }
     let mut ls = ListState::default();
     if focused {
+        block = block.border_style(Style::default().fg(Color::Green));
         ls.select(Some(data.state.session_selected));
     }
     let list = List::new(items)
@@ -601,10 +599,7 @@ mod tests {
 
     #[test]
     fn sessions_panel_right_aligns_duration() {
-        // NOTE(reviewer): terminal widened from 80→160 because the new ID prefix
-        // ("abcXXXXX  ", 10 chars) means the full row no longer fits in the
-        // 32-col left panel at 80 cols. At 160 cols the left panel is 64 cols
-        // (target=61), which comfortably fits the ~59-char row.
+        // Widened to 160 cols so the id prefix and timestamp fit in the left panel.
         let backend = TestBackend::new(160, 24);
         let mut term = Terminal::new(backend).unwrap();
         let projects = vec![Project {
