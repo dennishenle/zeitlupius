@@ -125,14 +125,15 @@ pub fn draw(f: &mut Frame, area: Rect, modal: &Modal) {
             let lines = vec![
                 Line::from("Keys"),
                 Line::from(""),
-                Line::from("j/k or ↓/↑   move selection"),
+                Line::from("j/k or ↓/↑   move selection (in focused panel)"),
+                Line::from("Tab          switch focus: Projects ↔ Sessions"),
                 Line::from("d/w/m/y      switch interval"),
                 Line::from("← / →        page back / forward"),
                 Line::from("g / Home     reset to current"),
                 Line::from("c            custom interval"),
                 Line::from("s / S        start / stop selected project"),
                 Line::from("n            new project"),
-                Line::from("D            delete selected project"),
+                Line::from("D            delete (project or session, by focus)"),
                 Line::from("r            reload from disk"),
                 Line::from("? / Esc      close help · q quit"),
             ];

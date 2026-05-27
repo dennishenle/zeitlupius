@@ -301,8 +301,8 @@ fn draw_footer(f: &mut Frame, area: Rect, data: &DashboardData) {
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Length(1)])
         .split(area);
-    let line1 = "d/w/m/y interval · ←/→ page · c custom · j/k select";
-    let line2 = "s start · S stop · n new · D delete · r reload · ? help · q quit";
+    let line1 = "d/w/m/y interval · ←/→ page · c custom · Tab focus · j/k select";
+    let line2 = "s start · S stop · n new · D delete (focus-aware) · r reload · ? help · q quit";
     f.render_widget(Paragraph::new(line1), split[0]);
     let l2 = if let Some((msg, _)) = &data.state.status_line {
         Paragraph::new(Line::from(Span::styled(
