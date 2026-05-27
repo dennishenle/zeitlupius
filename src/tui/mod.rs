@@ -156,6 +156,11 @@ fn handle_action<S: ProjectStore>(
             state.set_status(format!("created {n}"));
             Ok(true)
         }
+        Action::DeleteSessionConfirmed => {
+            // Full wiring implemented in Task 17.
+            state.modal = Modal::None;
+            Ok(false)
+        }
         Action::ApplyCustomInterval(from, to) => {
             state.interval = Interval::Custom { from, to };
             Ok(false)

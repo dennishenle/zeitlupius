@@ -9,6 +9,7 @@ pub enum Action {
     DeleteSelected,
     NewProject(String),
     DeleteConfirmed,
+    DeleteSessionConfirmed,
     ApplyCustomInterval(jiff::civil::Date, jiff::civil::Date),
     Reload,
 }
@@ -18,10 +19,8 @@ pub fn dispatch(key: KeyEvent, state: &mut AppState, today: jiff::civil::Date) -
     match modal {
         Modal::None => dispatch_dashboard(key, state, today),
         Modal::NewProject { input } => dispatch_new_project(key, input, state),
-        Modal::ConfirmDelete { .. } => dispatch_confirm_delete(key, state),
-        Modal::ConfirmDeleteSession { .. } => {
-            state.modal = Modal::None;
-            Action::None
+        Modal::ConfirmDelete { .. } | Modal::ConfirmDeleteSession { .. } => {
+            dispatch_confirm_delete(key, state)
         }
         Modal::CustomInterval {
             from, to, focus_to, ..
@@ -155,8 +154,15 @@ fn dispatch_new_project(key: KeyEvent, mut input: String, state: &mut AppState) 
 }
 
 fn dispatch_confirm_delete(key: KeyEvent, state: &mut AppState) -> Action {
+    let is_session = matches!(state.modal, Modal::ConfirmDeleteSession { .. });
     match key.code {
-        KeyCode::Char('y') | KeyCode::Char('Y') => Action::DeleteConfirmed,
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+            if is_session {
+                Action::DeleteSessionConfirmed
+            } else {
+                Action::DeleteConfirmed
+            }
+        }
         _ => {
             state.modal = Modal::None;
             Action::None
