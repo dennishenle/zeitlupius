@@ -60,6 +60,14 @@ fn event_loop<S: ProjectStore>(
         {
             state.status_line = None;
         }
+        state.sessions_visible = match projects.get(state.selected) {
+            Some(p) => crate::time::sessions_in(p, &state.interval, &now, tz)
+                .into_iter()
+                .map(|s| s.id.clone())
+                .collect(),
+            None => Vec::new(),
+        };
+        state.ensure_session_selection_valid();
         term.draw(|f| {
             draw_dashboard(
                 f,
@@ -130,15 +138,44 @@ fn handle_action<S: ProjectStore>(
             Ok(true)
         }
         Action::DeleteSelected => {
-            let Some(n) = state.selected_project().cloned() else {
-                return Ok(false);
-            };
-            let p = ops::load(store, &n)?;
-            state.modal = Modal::ConfirmDelete {
-                project: n,
-                running: p.running_session().is_some(),
-            };
-            Ok(false)
+            use crate::tui::app::Focus;
+            match state.focus {
+                Focus::Projects => {
+                    let Some(n) = state.selected_project().cloned() else {
+                        return Ok(false);
+                    };
+                    let p = ops::load(store, &n)?;
+                    state.modal = Modal::ConfirmDelete {
+                        project: n,
+                        running: p.running_session().is_some(),
+                    };
+                    Ok(false)
+                }
+                Focus::Sessions => {
+                    let Some(n) = state.selected_project().cloned() else {
+                        return Ok(false);
+                    };
+                    let Some(id) = state.sessions_visible.get(state.session_selected).cloned() else {
+                        return Ok(false);
+                    };
+                    let p = ops::load(store, &n)?;
+                    let Some(s) = p.sessions.iter().find(|s| s.id == id) else {
+                        return Ok(false);
+                    };
+                    let dur = match &s.stop {
+                        Some(z) => (z.timestamp().as_second() - s.start.timestamp().as_second()).max(0),
+                        None => (now.timestamp().as_second() - s.start.timestamp().as_second()).max(0),
+                    };
+                    state.modal = Modal::ConfirmDeleteSession {
+                        project: n,
+                        session_id: id,
+                        start: s.start.clone(),
+                        stop: s.stop.clone(),
+                        duration_seconds: dur,
+                    };
+                    Ok(false)
+                }
+            }
         }
         Action::DeleteConfirmed => {
             let Modal::ConfirmDelete { project, .. } =
@@ -157,9 +194,14 @@ fn handle_action<S: ProjectStore>(
             Ok(true)
         }
         Action::DeleteSessionConfirmed => {
-            // Full wiring implemented in Task 17.
-            state.modal = Modal::None;
-            Ok(false)
+            let Modal::ConfirmDeleteSession { project, session_id, .. } =
+                std::mem::replace(&mut state.modal, Modal::None)
+            else {
+                return Ok(false);
+            };
+            let removed = ops::delete_session(store, &project, &session_id)?;
+            state.set_status(format!("deleted session {}", removed.id));
+            Ok(true)
         }
         Action::ApplyCustomInterval(from, to) => {
             state.interval = Interval::Custom { from, to };
