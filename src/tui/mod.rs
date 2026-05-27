@@ -155,7 +155,8 @@ fn handle_action<S: ProjectStore>(
                     let Some(n) = state.selected_project().cloned() else {
                         return Ok(false);
                     };
-                    let Some(id) = state.sessions_visible.get(state.session_selected).cloned() else {
+                    let Some(id) = state.sessions_visible.get(state.session_selected).cloned()
+                    else {
                         return Ok(false);
                     };
                     let p = ops::load(store, &n)?;
@@ -163,8 +164,12 @@ fn handle_action<S: ProjectStore>(
                         return Ok(false);
                     };
                     let dur = match &s.stop {
-                        Some(z) => (z.timestamp().as_second() - s.start.timestamp().as_second()).max(0),
-                        None => (now.timestamp().as_second() - s.start.timestamp().as_second()).max(0),
+                        Some(z) => {
+                            (z.timestamp().as_second() - s.start.timestamp().as_second()).max(0)
+                        }
+                        None => {
+                            (now.timestamp().as_second() - s.start.timestamp().as_second()).max(0)
+                        }
                     };
                     state.modal = Modal::ConfirmDeleteSession {
                         project: n,
@@ -194,8 +199,11 @@ fn handle_action<S: ProjectStore>(
             Ok(true)
         }
         Action::DeleteSessionConfirmed => {
-            let Modal::ConfirmDeleteSession { project, session_id, .. } =
-                std::mem::replace(&mut state.modal, Modal::None)
+            let Modal::ConfirmDeleteSession {
+                project,
+                session_id,
+                ..
+            } = std::mem::replace(&mut state.modal, Modal::None)
             else {
                 return Ok(false);
             };

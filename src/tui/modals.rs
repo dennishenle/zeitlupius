@@ -108,7 +108,10 @@ pub fn draw(f: &mut Frame, area: Rect, modal: &Modal) {
                     start.strftime("%d.%m.%Y %H:%M:%S"),
                     stop_str
                 )),
-                Line::from(format!("Duration: {}", crate::cli::format::fmt_hms(*duration_seconds))),
+                Line::from(format!(
+                    "Duration: {}",
+                    crate::cli::format::fmt_hms(*duration_seconds)
+                )),
                 Line::from(""),
                 Line::from("y to confirm · N/Esc to cancel"),
             ];
