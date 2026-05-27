@@ -676,11 +676,22 @@ mod tests {
         let now = z(11);
         let tz = TimeZone::UTC;
         term.draw(|f| {
-            draw(f, &DashboardData { state: &state, projects: &projects, now: &now, tz: &tz });
+            draw(
+                f,
+                &DashboardData {
+                    state: &state,
+                    projects: &projects,
+                    now: &now,
+                    tz: &tz,
+                },
+            );
         })
         .unwrap();
         let text = buffer_left_half(&term);
-        assert!(text.contains("abcdef23"), "session id missing from panel: {text}");
+        assert!(
+            text.contains("abcdef23"),
+            "session id missing from panel: {text}"
+        );
     }
 
     #[test]
@@ -704,7 +715,15 @@ mod tests {
         let now = z(11);
         let tz = TimeZone::UTC;
         term.draw(|f| {
-            draw(f, &DashboardData { state: &state, projects: &projects, now: &now, tz: &tz });
+            draw(
+                f,
+                &DashboardData {
+                    state: &state,
+                    projects: &projects,
+                    now: &now,
+                    tz: &tz,
+                },
+            );
         })
         .unwrap();
 
@@ -717,7 +736,10 @@ mod tests {
                 }
             }
         }
-        assert!(green_count > 0, "expected some green-fg cells for focused border");
+        assert!(
+            green_count > 0,
+            "expected some green-fg cells for focused border"
+        );
     }
 
     #[test]
