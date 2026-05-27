@@ -168,15 +168,21 @@ fn draw_project_list(f: &mut Frame, area: Rect, data: &DashboardData) {
         .collect();
     let mut ls = ListState::default();
     ls.select(Some(data.state.selected));
+    let focused = data.state.focus == crate::tui::app::Focus::Projects;
+    let mut block = Block::default().borders(Borders::ALL).title("Projects");
+    if focused {
+        block = block.border_style(Style::default().fg(Color::Green));
+    }
     let list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("Projects"))
+        .block(block)
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
     f.render_stateful_widget(list, area, &mut ls);
 }
 
 fn draw_sessions_panel(f: &mut Frame, area: Rect, data: &DashboardData) {
     use crate::time::sessions_in;
-    let target = (area.width as usize).saturating_sub(3); // 2 borders + 1 right gap
+    use crate::tui::app::Focus;
+    let target = (area.width as usize).saturating_sub(3);
 
     let sessions: Vec<&crate::model::Session> = match data.projects.get(data.state.selected) {
         Some(p) => sessions_in(p, &data.state.interval, data.now, data.tz),
@@ -194,7 +200,12 @@ fn draw_sessions_panel(f: &mut Frame, area: Rect, data: &DashboardData) {
                 Some(stop) => stop.timestamp().as_second() - s.start.timestamp().as_second(),
                 None => 0,
             };
-            let left_text = format!("{} → {}", s.start.strftime("%d.%m.%Y %H:%M:%S"), stop);
+            let left_text = format!(
+                "{}  {} → {}",
+                s.id,
+                s.start.strftime("%d.%m.%Y %H:%M:%S"),
+                stop
+            );
             ListItem::new(right_aligned_row(
                 vec![(left_text, Style::default())],
                 (fmt_hms(secs), Style::default()),
@@ -202,8 +213,20 @@ fn draw_sessions_panel(f: &mut Frame, area: Rect, data: &DashboardData) {
             ))
         })
         .collect();
-    let list = List::new(items).block(Block::default().borders(Borders::ALL).title("Sessions"));
-    f.render_widget(list, area);
+
+    let focused = data.state.focus == Focus::Sessions;
+    let mut block = Block::default().borders(Borders::ALL).title("Sessions");
+    if focused {
+        block = block.border_style(Style::default().fg(Color::Green));
+    }
+    let mut ls = ListState::default();
+    if focused {
+        ls.select(Some(data.state.session_selected));
+    }
+    let list = List::new(items)
+        .block(block)
+        .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+    f.render_stateful_widget(list, area, &mut ls);
 }
 
 fn draw_detail(f: &mut Frame, area: Rect, data: &DashboardData) {
@@ -578,7 +601,11 @@ mod tests {
 
     #[test]
     fn sessions_panel_right_aligns_duration() {
-        let backend = TestBackend::new(80, 24);
+        // NOTE(reviewer): terminal widened from 80→160 because the new ID prefix
+        // ("abcXXXXX  ", 10 chars) means the full row no longer fits in the
+        // 32-col left panel at 80 cols. At 160 cols the left panel is 64 cols
+        // (target=61), which comfortably fits the ~59-char row.
+        let backend = TestBackend::new(160, 24);
         let mut term = Terminal::new(backend).unwrap();
         let projects = vec![Project {
             name: ProjectName::parse("p").unwrap(),
@@ -607,12 +634,12 @@ mod tests {
         .unwrap();
 
         // Sessions panel occupies the bottom half of the left column.
-        // Left column width = 40% of 80 = 32 cols (0..32). Right border at
-        // col 31; last inner column at 30. Find the row containing the start
+        // Left column width = 40% of 160 = 64 cols (0..64). Right border at
+        // col 63; last inner column at 62. Find the row containing the start
         // timestamp instead of hardcoding y.
         let buf = term.backend().buffer();
-        let left_width: u16 = 32;
-        let inner_right: u16 = left_width - 2; // = 30
+        let left_width: u16 = 64;
+        let inner_right: u16 = left_width - 2; // = 62
         let mut row_y: Option<u16> = None;
         for y in 0..buf.area.height {
             let mut row = String::new();
@@ -633,6 +660,69 @@ mod tests {
         // Column inner_right - 1 must be the last digit of the duration "1:00:00" → '0'.
         let last = buf[(inner_right - 1, row_y)].symbol();
         assert_eq!(last, "0", "duration should end at inner_right - 1");
+    }
+
+    #[test]
+    fn sessions_panel_renders_session_id() {
+        let backend = TestBackend::new(120, 30);
+        let mut term = Terminal::new(backend).unwrap();
+        let id = crate::model::SessionId::parse("abcdef23").unwrap();
+        let projects = vec![Project {
+            name: ProjectName::parse("p").unwrap(),
+            sessions: vec![Session {
+                id: id.clone(),
+                start: z(9),
+                stop: Some(z(10)),
+                note: None,
+            }],
+        }];
+        let names = vec![ProjectName::parse("p").unwrap()];
+        let state = AppState::new(date(2026, 5, 4), names);
+        let now = z(11);
+        let tz = TimeZone::UTC;
+        term.draw(|f| {
+            draw(f, &DashboardData { state: &state, projects: &projects, now: &now, tz: &tz });
+        })
+        .unwrap();
+        let text = buffer_left_half(&term);
+        assert!(text.contains("abcdef23"), "session id missing from panel: {text}");
+    }
+
+    #[test]
+    fn focused_panel_has_green_border() {
+        use ratatui::style::Color;
+        let backend = TestBackend::new(120, 30);
+        let mut term = Terminal::new(backend).unwrap();
+        let id = crate::model::SessionId::parse("abcdef23").unwrap();
+        let projects = vec![Project {
+            name: ProjectName::parse("p").unwrap(),
+            sessions: vec![Session {
+                id,
+                start: z(9),
+                stop: Some(z(10)),
+                note: None,
+            }],
+        }];
+        let names = vec![ProjectName::parse("p").unwrap()];
+        let mut state = AppState::new(date(2026, 5, 4), names);
+        state.focus = crate::tui::app::Focus::Sessions;
+        let now = z(11);
+        let tz = TimeZone::UTC;
+        term.draw(|f| {
+            draw(f, &DashboardData { state: &state, projects: &projects, now: &now, tz: &tz });
+        })
+        .unwrap();
+
+        let buf = term.backend().buffer();
+        let mut green_count = 0;
+        for y in 0..buf.area.height {
+            for x in 0..buf.area.width {
+                if buf[(x, y)].style().fg == Some(Color::Green) {
+                    green_count += 1;
+                }
+            }
+        }
+        assert!(green_count > 0, "expected some green-fg cells for focused border");
     }
 
     #[test]
