@@ -292,11 +292,18 @@ fn draw_detail(f: &mut Frame, area: Rect, data: &DashboardData) {
             "Active session",
             Style::default().add_modifier(Modifier::BOLD),
         )));
-        lines.push(Line::from(format!(
+        let mut spans = vec![Span::raw(format!(
             " started {} for {}",
             s.start.strftime("%d.%m.%Y %H:%M:%S"),
             fmt_hms(r)
-        )));
+        ))];
+        if let Some(note) = note_text(&s.note) {
+            spans.push(Span::styled(
+                format!("   {note}"),
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+        lines.push(Line::from(spans));
         lines.push(Line::from(""));
     }
     lines.push(Line::from(Span::styled(
@@ -314,12 +321,19 @@ fn draw_detail(f: &mut Frame, area: Rect, data: &DashboardData) {
             Some(stop) => stop.timestamp().as_second() - s.start.timestamp().as_second(),
             None => (data.now.timestamp().as_second() - s.start.timestamp().as_second()).max(0),
         };
-        lines.push(Line::from(format!(
+        let mut spans = vec![Span::raw(format!(
             " {}  →  {}    {}",
             s.start.strftime("%d.%m.%Y %H:%M:%S"),
             stop,
             fmt_hms(secs)
-        )));
+        ))];
+        if let Some(note) = note_text(&s.note) {
+            spans.push(Span::styled(
+                format!("   {note}"),
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+        lines.push(Line::from(spans));
     }
     let par = Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title("Detail"));
     f.render_widget(par, area);
@@ -450,6 +464,89 @@ mod tests {
         assert!(
             text.contains("fixed the parser bug"),
             "note text missing from sessions panel: {text}"
+        );
+    }
+
+    #[test]
+    fn detail_recent_list_shows_note_inline() {
+        // Wide backend so the long detail row (timestamps + duration + note)
+        // is not clipped before the note, and lands in the right half.
+        let backend = TestBackend::new(200, 30);
+        let mut term = Terminal::new(backend).unwrap();
+        let projects = vec![Project {
+            name: ProjectName::parse("p").unwrap(),
+            sessions: vec![Session {
+                id: SessionId::generate(),
+                start: z(9),
+                stop: Some(z(10)),
+                note: Some("refactored intersect".to_string()),
+            }],
+        }];
+        let names = vec![ProjectName::parse("p").unwrap()];
+        let state = AppState::new(date(2026, 5, 4), names);
+        let now = z(11);
+        let tz = TimeZone::UTC;
+        term.draw(|f| {
+            draw(
+                f,
+                &DashboardData {
+                    state: &state,
+                    projects: &projects,
+                    now: &now,
+                    tz: &tz,
+                },
+            )
+        })
+        .unwrap();
+        let text = buffer_right_half(&term);
+        assert!(
+            text.contains("refactored intersect"),
+            "recent-session note missing from detail panel: {text}"
+        );
+    }
+
+    #[test]
+    fn detail_active_session_shows_note_inline() {
+        let backend = TestBackend::new(200, 30);
+        let mut term = Terminal::new(backend).unwrap();
+        let projects = vec![Project {
+            name: ProjectName::parse("p").unwrap(),
+            sessions: vec![Session {
+                id: SessionId::generate(),
+                start: z(11),
+                stop: None,
+                note: Some("planning the release".to_string()),
+            }],
+        }];
+        let names = vec![ProjectName::parse("p").unwrap()];
+        let state = AppState::new(date(2026, 5, 4), names);
+        let now = z(12);
+        let tz = TimeZone::UTC;
+        term.draw(|f| {
+            draw(
+                f,
+                &DashboardData {
+                    state: &state,
+                    projects: &projects,
+                    now: &now,
+                    tz: &tz,
+                },
+            )
+        })
+        .unwrap();
+        // The running session does not appear in the Sessions panel, so a full-buffer
+        // match is unambiguous here.
+        let buf = term.backend().buffer();
+        let mut text = String::new();
+        for y in 0..buf.area.height {
+            for x in 0..buf.area.width {
+                text.push_str(buf[(x, y)].symbol());
+            }
+            text.push('\n');
+        }
+        assert!(
+            text.contains("planning the release"),
+            "active-session note missing from detail panel: {text}"
         );
     }
 
