@@ -67,6 +67,23 @@ fn right_aligned_row(
     Line::from(spans)
 }
 
+/// Returns the note text only when present and not blank.
+fn note_text(note: &Option<String>) -> Option<&str> {
+    note.as_deref().filter(|s| !s.trim().is_empty())
+}
+
+/// Truncate `s` to at most `max` columns, replacing the tail with `…` on overflow.
+fn truncate_ellipsis(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
+    if max == 0 {
+        return String::new();
+    }
+    let head: String = s.chars().take(max - 1).collect();
+    format!("{head}…")
+}
+
 pub fn draw(f: &mut Frame, data: &DashboardData) {
     let area = f.area();
     let outer = Layout::default()
@@ -346,6 +363,45 @@ mod tests {
             out.push('\n');
         }
         out
+    }
+
+    fn buffer_right_half(term: &Terminal<TestBackend>) -> String {
+        let buf = term.backend().buffer();
+        let mid = buf.area.width / 2;
+        let mut out = String::new();
+        for y in 0..buf.area.height {
+            for x in mid..buf.area.width {
+                out.push_str(buf[(x, y)].symbol());
+            }
+            out.push('\n');
+        }
+        out
+    }
+
+    #[test]
+    fn note_text_filters_empty_and_whitespace() {
+        assert_eq!(note_text(&None), None);
+        assert_eq!(note_text(&Some(String::new())), None);
+        assert_eq!(note_text(&Some("   ".to_string())), None);
+        assert_eq!(note_text(&Some("hi".to_string())), Some("hi"));
+    }
+
+    #[test]
+    fn truncate_ellipsis_leaves_short_text_unchanged() {
+        assert_eq!(truncate_ellipsis("abc", 5), "abc");
+        assert_eq!(truncate_ellipsis("abc", 3), "abc");
+    }
+
+    #[test]
+    fn truncate_ellipsis_truncates_with_marker() {
+        let out = truncate_ellipsis("abcdef", 4);
+        assert_eq!(out.chars().count(), 4);
+        assert_eq!(out, "abc…");
+    }
+
+    #[test]
+    fn truncate_ellipsis_zero_width_is_empty() {
+        assert_eq!(truncate_ellipsis("abc", 0), "");
     }
 
     #[test]
