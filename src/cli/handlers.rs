@@ -236,6 +236,13 @@ fn session<S: ProjectStore, W: Write>(
             )?;
             Ok(())
         }
+        SessionCmd::SetNote { project, id, note } => {
+            let name = ProjectName::parse(&project)?;
+            let sid = SessionId::parse(&id)?;
+            ops::update_note(store, &name, &sid, note)?;
+            writeln!(out, "updated note for session {id} in '{project}'")?;
+            Ok(())
+        }
     }
 }
 

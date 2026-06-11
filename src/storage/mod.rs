@@ -19,6 +19,7 @@ pub trait ProjectStore: Send + Sync {
     ) -> Result<()>;
     fn close_open(&self, name: &ProjectName, stop: &jiff::Zoned) -> Result<()>;
     fn delete_session(&self, name: &ProjectName, id: &SessionId) -> Result<Session>;
+    fn update_note(&self, name: &ProjectName, id: &SessionId, note: Option<String>) -> Result<()>;
 }
 
 #[cfg(test)]
@@ -139,6 +140,23 @@ pub mod mem {
                 .position(|s| s.id == *id)
                 .ok_or_else(|| Error::SessionNotFound(name.to_string(), id.to_string()))?;
             Ok(v.remove(pos))
+        }
+        fn update_note(
+            &self,
+            name: &ProjectName,
+            id: &SessionId,
+            note: Option<String>,
+        ) -> Result<()> {
+            let mut g = self.inner.lock().unwrap();
+            let v = g
+                .get_mut(name.as_str())
+                .ok_or_else(|| Error::ProjectNotFound(name.to_string()))?;
+            let session = v
+                .iter_mut()
+                .find(|s| s.id == *id)
+                .ok_or_else(|| Error::SessionNotFound(name.to_string(), id.to_string()))?;
+            session.note = note;
+            Ok(())
         }
     }
 

@@ -154,3 +154,51 @@ fn legacy_csv_is_migrated_on_session_list() {
         "header not rewritten: {after}"
     );
 }
+
+#[test]
+fn session_set_note_sets_and_clears() {
+    let td = TempDir::new().unwrap();
+    cmd(&td).args(["create", "p"]).assert().success();
+    cmd(&td).args(["start", "p"]).assert().success();
+    cmd(&td).args(["stop", "p"]).assert().success();
+
+    // Get session id via JSON
+    let json = cmd(&td)
+        .args(["session", "list", "p", "--json"])
+        .output()
+        .unwrap()
+        .stdout;
+    let json = String::from_utf8(json).unwrap();
+    let id_start = json.find("\"id\":\"").unwrap() + "\"id\":\"".len();
+    let id_end = id_start + 8;
+    let id = &json[id_start..id_end];
+
+    // Set a note
+    cmd(&td)
+        .args(["session", "set-note", "p", id, "--note", "test note"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("updated note"));
+
+    // Verify note appears in re-listed JSON
+    let json2 = cmd(&td)
+        .args(["session", "list", "p", "--json"])
+        .output()
+        .unwrap()
+        .stdout;
+    assert!(String::from_utf8(json2).unwrap().contains("test note"));
+
+    // Clear the note by setting empty string
+    cmd(&td)
+        .args(["session", "set-note", "p", id, "--note", ""])
+        .assert()
+        .success();
+
+    // Verify it's gone (null in JSON)
+    let json3 = cmd(&td)
+        .args(["session", "list", "p", "--json"])
+        .output()
+        .unwrap()
+        .stdout;
+    assert!(String::from_utf8(json3).unwrap().contains("\"note\":null"));
+}

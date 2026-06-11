@@ -38,6 +38,11 @@ pub enum Modal {
         focus_to: bool,
         error: Option<String>,
     },
+    EditNote {
+        project: ProjectName,
+        session_id: crate::model::SessionId,
+        input: String,
+    },
     Help,
 }
 

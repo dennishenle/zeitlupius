@@ -204,6 +204,19 @@ impl ProjectStore for FsStore {
             Ok(removed)
         })
     }
+
+    fn update_note(&self, name: &ProjectName, id: &SessionId, note: Option<String>) -> Result<()> {
+        self.with_lock(|| {
+            let (mut p, _) = self.load_inner(name)?;
+            let session = p
+                .sessions
+                .iter_mut()
+                .find(|s| s.id == *id)
+                .ok_or_else(|| Error::SessionNotFound(name.to_string(), id.to_string()))?;
+            session.note = note;
+            self.save_inner(&p)
+        })
+    }
 }
 
 #[cfg(test)]
