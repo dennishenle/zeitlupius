@@ -223,11 +223,23 @@ fn draw_sessions_panel(f: &mut Frame, area: Rect, data: &DashboardData) {
                 s.start.strftime("%d.%m.%Y %H:%M:%S"),
                 stop
             );
-            ListItem::new(right_aligned_row(
+            let row = right_aligned_row(
                 vec![(left_text, Style::default())],
                 (fmt_hms(secs), Style::default()),
                 target,
-            ))
+            );
+            let mut lines = vec![row];
+            if let Some(note) = note_text(&s.note) {
+                // 10 spaces aligns the marker under the timestamps (8-char id + 2 spaces).
+                let indent = "          ↳ ";
+                let avail = target.saturating_sub(indent.chars().count());
+                let body = truncate_ellipsis(note, avail);
+                lines.push(Line::from(Span::styled(
+                    format!("{indent}{body}"),
+                    Style::default().fg(Color::DarkGray),
+                )));
+            }
+            ListItem::new(lines)
         })
         .collect();
 
@@ -402,6 +414,79 @@ mod tests {
     #[test]
     fn truncate_ellipsis_zero_width_is_empty() {
         assert_eq!(truncate_ellipsis("abc", 0), "");
+    }
+
+    #[test]
+    fn sessions_panel_shows_note_on_second_line() {
+        let backend = TestBackend::new(120, 30);
+        let mut term = Terminal::new(backend).unwrap();
+        let projects = vec![Project {
+            name: ProjectName::parse("p").unwrap(),
+            sessions: vec![Session {
+                id: SessionId::generate(),
+                start: z(9),
+                stop: Some(z(10)),
+                note: Some("fixed the parser bug".to_string()),
+            }],
+        }];
+        let names = vec![ProjectName::parse("p").unwrap()];
+        let state = AppState::new(date(2026, 5, 4), names);
+        let now = z(11);
+        let tz = TimeZone::UTC;
+        term.draw(|f| {
+            draw(
+                f,
+                &DashboardData {
+                    state: &state,
+                    projects: &projects,
+                    now: &now,
+                    tz: &tz,
+                },
+            )
+        })
+        .unwrap();
+        let text = buffer_left_half(&term);
+        assert!(text.contains('↳'), "note marker missing: {text}");
+        assert!(
+            text.contains("fixed the parser bug"),
+            "note text missing from sessions panel: {text}"
+        );
+    }
+
+    #[test]
+    fn sessions_panel_no_note_has_no_marker() {
+        let backend = TestBackend::new(120, 30);
+        let mut term = Terminal::new(backend).unwrap();
+        let projects = vec![Project {
+            name: ProjectName::parse("p").unwrap(),
+            sessions: vec![Session {
+                id: SessionId::generate(),
+                start: z(9),
+                stop: Some(z(10)),
+                note: None,
+            }],
+        }];
+        let names = vec![ProjectName::parse("p").unwrap()];
+        let state = AppState::new(date(2026, 5, 4), names);
+        let now = z(11);
+        let tz = TimeZone::UTC;
+        term.draw(|f| {
+            draw(
+                f,
+                &DashboardData {
+                    state: &state,
+                    projects: &projects,
+                    now: &now,
+                    tz: &tz,
+                },
+            )
+        })
+        .unwrap();
+        let text = buffer_left_half(&term);
+        assert!(
+            !text.contains('↳'),
+            "note marker should be absent when note is None: {text}"
+        );
     }
 
     #[test]
