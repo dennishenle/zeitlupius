@@ -28,7 +28,7 @@ Today each session renders as a single-line `ListItem` produced by
 
 Change: when a session's note is `Some` and non-empty, the `ListItem` becomes
 two lines — the existing row, followed by a dimmed note line indented to align
-under the timestamps, prefixed with `↳ `, and truncated with `…` to the panel's
+under the timestamps, prefixed with `↳`, and truncated with `…` to the panel's
 inner width. Sessions with no note (or an empty note) stay single-line.
 
 ```
