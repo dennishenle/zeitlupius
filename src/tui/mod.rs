@@ -211,6 +211,15 @@ fn handle_action<S: ProjectStore>(
             state.set_status(format!("deleted session {}", removed.id));
             Ok(true)
         }
+        Action::EditNoteConfirmed {
+            project,
+            session_id,
+            note,
+        } => {
+            ops::update_note(store, &project, &session_id, note)?;
+            state.set_status(format!("note set for session {session_id}"));
+            Ok(true)
+        }
         Action::ApplyCustomInterval(from, to) => {
             state.interval = Interval::Custom { from, to };
             Ok(false)

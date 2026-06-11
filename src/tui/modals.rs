@@ -124,6 +124,27 @@ pub fn draw(f: &mut Frame, area: Rect, modal: &Modal) {
                 popup,
             );
         }
+        Modal::EditNote {
+            project,
+            session_id,
+            input,
+        } => {
+            let lines = vec![
+                Line::from(format!("Edit note for {project}/{session_id}:")),
+                Line::from(""),
+                Line::from(Span::styled(
+                    input.clone(),
+                    Style::default().add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+                Line::from("Enter to save · Esc to cancel"),
+            ];
+            f.render_widget(
+                Paragraph::new(lines)
+                    .block(Block::default().borders(Borders::ALL).title("Edit note")),
+                popup,
+            );
+        }
         Modal::Help => {
             let lines = vec![
                 Line::from("Keys"),
@@ -137,6 +158,7 @@ pub fn draw(f: &mut Frame, area: Rect, modal: &Modal) {
                 Line::from("s / S        start / stop selected project"),
                 Line::from("n            new project"),
                 Line::from("D            delete (project or session, by focus)"),
+                Line::from("e            edit note (sessions focus)"),
                 Line::from("r            reload from disk"),
                 Line::from("? / Esc      close help · q quit"),
             ];
@@ -170,6 +192,7 @@ fn centered(area: Rect, width_pct: u16, height_pct: u16) -> Rect {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::{ProjectName, SessionId};
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
 
@@ -187,6 +210,11 @@ mod tests {
                 to: "02.01.2026".into(),
                 focus_to: true,
                 error: None,
+            },
+            Modal::EditNote {
+                project: ProjectName::parse("p").unwrap(),
+                session_id: SessionId::parse("aaaaaaaa").unwrap(),
+                input: "hello".into(),
             },
         ] {
             term.draw(|f| draw(f, f.area(), &m)).unwrap();

@@ -12,6 +12,11 @@ pub enum Action {
     DeleteSessionConfirmed,
     ApplyCustomInterval(jiff::civil::Date, jiff::civil::Date),
     Reload,
+    EditNoteConfirmed {
+        project: crate::model::ProjectName,
+        session_id: crate::model::SessionId,
+        note: Option<String>,
+    },
 }
 
 pub fn dispatch(key: KeyEvent, state: &mut AppState, today: jiff::civil::Date) -> Action {
@@ -25,6 +30,7 @@ pub fn dispatch(key: KeyEvent, state: &mut AppState, today: jiff::civil::Date) -
         Modal::CustomInterval {
             from, to, focus_to, ..
         } => dispatch_custom(key, from, to, focus_to, state),
+        Modal::EditNote { input, .. } => dispatch_edit_note(key, input, state),
         Modal::Help => {
             if matches!(
                 key.code,
@@ -124,6 +130,20 @@ fn dispatch_dashboard(key: KeyEvent, state: &mut AppState, today: jiff::civil::D
         KeyCode::Char('s') => Action::StartSelected,
         KeyCode::Char('S') => Action::StopSelected,
         KeyCode::Char('D') => Action::DeleteSelected,
+        KeyCode::Char('e') if matches!(state.focus, crate::tui::app::Focus::Sessions) => {
+            let Some(n) = state.selected_project().cloned() else {
+                return Action::None;
+            };
+            let Some(id) = state.sessions_visible.get(state.session_selected).cloned() else {
+                return Action::None;
+            };
+            state.modal = Modal::EditNote {
+                project: n,
+                session_id: id,
+                input: String::new(),
+            };
+            Action::None
+        }
         KeyCode::Char('r') => Action::Reload,
         _ => Action::None,
     }
@@ -250,6 +270,51 @@ fn parse_dot_date(s: &str) -> Option<jiff::civil::Date> {
     jiff::civil::Date::new(yyyy, mm, dd).ok()
 }
 
+fn dispatch_edit_note(key: KeyEvent, mut input: String, state: &mut AppState) -> Action {
+    let Modal::EditNote {
+        project,
+        session_id,
+        ..
+    } = state.modal.clone()
+    else {
+        return Action::None;
+    };
+    match key.code {
+        KeyCode::Esc => {
+            state.modal = Modal::None;
+            Action::None
+        }
+        KeyCode::Enter => {
+            let note = if input.is_empty() { None } else { Some(input) };
+            state.modal = Modal::None;
+            Action::EditNoteConfirmed {
+                project,
+                session_id,
+                note,
+            }
+        }
+        KeyCode::Backspace => {
+            input.pop();
+            state.modal = Modal::EditNote {
+                project: project.clone(),
+                session_id: session_id.clone(),
+                input,
+            };
+            Action::None
+        }
+        KeyCode::Char(c) => {
+            input.push(c);
+            state.modal = Modal::EditNote {
+                project: project.clone(),
+                session_id: session_id.clone(),
+                input,
+            };
+            Action::None
+        }
+        _ => Action::None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -336,5 +401,54 @@ mod tests {
         s.focus = Focus::Sessions;
         let act = dispatch(key(KeyCode::Char('D')), &mut s, date(2026, 5, 4));
         assert!(matches!(act, Action::DeleteSelected));
+    }
+
+    #[test]
+    fn e_opens_edit_note_modal_in_sessions_focus() {
+        let mut s = AppState::new(date(2026, 5, 4), names(&["a"]));
+        s.focus = Focus::Sessions;
+        s.sessions_visible = vec![crate::model::SessionId::parse("aaaaaaaa").unwrap()];
+        dispatch(key(KeyCode::Char('e')), &mut s, date(2026, 5, 4));
+        assert!(matches!(s.modal, Modal::EditNote { .. }));
+    }
+
+    #[test]
+    fn e_does_nothing_in_projects_focus() {
+        let mut s = AppState::new(date(2026, 5, 4), names(&["a"]));
+        s.focus = Focus::Projects;
+        let act = dispatch(key(KeyCode::Char('e')), &mut s, date(2026, 5, 4));
+        assert!(matches!(act, Action::None));
+        assert!(!matches!(s.modal, Modal::EditNote { .. }));
+    }
+
+    #[test]
+    fn edit_note_modal_typing_and_confirm() {
+        let mut s = AppState::new(date(2026, 5, 4), names(&["a"]));
+        s.focus = Focus::Sessions;
+        s.sessions_visible = vec![crate::model::SessionId::parse("aaaaaaaa").unwrap()];
+        dispatch(key(KeyCode::Char('e')), &mut s, date(2026, 5, 4));
+        assert!(matches!(s.modal, Modal::EditNote { .. }));
+        // Type some characters
+        for ch in "test note".chars() {
+            let _ = dispatch(key(KeyCode::Char(ch)), &mut s, date(2026, 5, 4));
+        }
+        let act = dispatch(key(KeyCode::Enter), &mut s, date(2026, 5, 4));
+        match act {
+            Action::EditNoteConfirmed { note, .. } => {
+                assert_eq!(note.as_deref(), Some("test note"))
+            }
+            _ => panic!("expected EditNoteConfirmed"),
+        }
+    }
+
+    #[test]
+    fn edit_note_cancel_on_esc() {
+        let mut s = AppState::new(date(2026, 5, 4), names(&["a"]));
+        s.focus = Focus::Sessions;
+        s.sessions_visible = vec![crate::model::SessionId::parse("aaaaaaaa").unwrap()];
+        dispatch(key(KeyCode::Char('e')), &mut s, date(2026, 5, 4));
+        let act = dispatch(key(KeyCode::Esc), &mut s, date(2026, 5, 4));
+        assert!(matches!(act, Action::None));
+        assert!(matches!(s.modal, Modal::None));
     }
 }

@@ -28,6 +28,15 @@ pub fn delete_session<S: ProjectStore>(
     store.delete_session(name, id)
 }
 
+pub fn update_note<S: ProjectStore>(
+    store: &S,
+    name: &ProjectName,
+    id: &crate::model::SessionId,
+    note: Option<String>,
+) -> Result<()> {
+    store.update_note(name, id, note)
+}
+
 pub fn list<S: ProjectStore>(store: &S) -> Result<Vec<ProjectName>> {
     store.list()
 }

@@ -302,7 +302,12 @@ fn draw_footer(f: &mut Frame, area: Rect, data: &DashboardData) {
         .constraints([Constraint::Length(1), Constraint::Length(1)])
         .split(area);
     let line1 = "d/w/m/y interval · ←/→ page · c custom · Tab focus · j/k select";
-    let line2 = "s start · S stop · n new · D delete (focus-aware) · r reload · ? help · q quit";
+    let edit = if data.state.focus == crate::tui::app::Focus::Sessions {
+        "e edit note · "
+    } else {
+        ""
+    };
+    let line2 = format!("s start · S stop · n new · D delete · {edit}r reload · ? help · q quit");
     f.render_widget(Paragraph::new(line1), split[0]);
     let l2 = if let Some((msg, _)) = &data.state.status_line {
         Paragraph::new(Line::from(Span::styled(
@@ -739,6 +744,59 @@ mod tests {
         assert!(
             green_count > 0,
             "expected some green-fg cells for focused border"
+        );
+    }
+
+    fn footer_text(focus: crate::tui::app::Focus) -> String {
+        let backend = TestBackend::new(120, 30);
+        let mut term = Terminal::new(backend).unwrap();
+        let projects = vec![Project {
+            name: ProjectName::parse("p").unwrap(),
+            sessions: vec![Session {
+                id: SessionId::generate(),
+                start: z(9),
+                stop: Some(z(10)),
+                note: None,
+            }],
+        }];
+        let names = vec![ProjectName::parse("p").unwrap()];
+        let mut state = AppState::new(date(2026, 5, 4), names);
+        state.focus = focus;
+        let now = z(11);
+        let tz = TimeZone::UTC;
+        term.draw(|f| {
+            draw(
+                f,
+                &DashboardData {
+                    state: &state,
+                    projects: &projects,
+                    now: &now,
+                    tz: &tz,
+                },
+            );
+        })
+        .unwrap();
+        let buf = term.backend().buffer();
+        let mut out = String::new();
+        for y in 0..buf.area.height {
+            for x in 0..buf.area.width {
+                out.push_str(buf[(x, y)].symbol());
+            }
+            out.push('\n');
+        }
+        out
+    }
+
+    #[test]
+    fn footer_shows_edit_note_only_when_sessions_focused() {
+        use crate::tui::app::Focus;
+        assert!(
+            footer_text(Focus::Sessions).contains("e edit note"),
+            "sessions focus should advertise the edit-note key"
+        );
+        assert!(
+            !footer_text(Focus::Projects).contains("e edit note"),
+            "projects focus should not advertise the edit-note key"
         );
     }
 

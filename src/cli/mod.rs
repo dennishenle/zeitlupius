@@ -85,6 +85,12 @@ pub enum SessionCmd {
         #[arg(long, short = 'f')]
         force: bool,
     },
+    SetNote {
+        project: String,
+        id: String,
+        #[arg(long)]
+        note: Option<String>,
+    },
 }
 
 #[cfg(test)]
@@ -175,6 +181,42 @@ mod tests {
                 assert_eq!(project, "p");
                 assert_eq!(id, "abcdef23");
                 assert!(force);
+            }
+            _ => panic!("wrong subcommand"),
+        }
+    }
+
+    #[test]
+    fn parses_session_set_note() {
+        let cli = Cli::try_parse_from([
+            "zeitlupius",
+            "session",
+            "set-note",
+            "p",
+            "abcdef23",
+            "--note",
+            "hello world",
+        ])
+        .unwrap();
+        match cli.command {
+            Some(Command::Session(SessionCmd::SetNote { project, id, note })) => {
+                assert_eq!(project, "p");
+                assert_eq!(id, "abcdef23");
+                assert_eq!(note.as_deref(), Some("hello world"));
+            }
+            _ => panic!("wrong subcommand"),
+        }
+    }
+
+    #[test]
+    fn parses_session_set_note_without_flag() {
+        let cli =
+            Cli::try_parse_from(["zeitlupius", "session", "set-note", "p", "abcdef23"]).unwrap();
+        match cli.command {
+            Some(Command::Session(SessionCmd::SetNote { project, id, note })) => {
+                assert_eq!(project, "p");
+                assert_eq!(id, "abcdef23");
+                assert!(note.is_none());
             }
             _ => panic!("wrong subcommand"),
         }
