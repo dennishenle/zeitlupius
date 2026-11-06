@@ -150,7 +150,7 @@ fn draw_body(f: &mut Frame, area: Rect, data: &DashboardData) {
         .split(cols[0]);
     draw_project_list(f, left[0], data);
     draw_sessions_panel(f, left[1], data);
-    draw_detail(f, cols[1], data);
+    draw_right_column(f, cols[1], data);
 }
 
 fn draw_project_list(f: &mut Frame, area: Rect, data: &DashboardData) {
@@ -260,11 +260,26 @@ fn draw_sessions_panel(f: &mut Frame, area: Rect, data: &DashboardData) {
     f.render_stateful_widget(list, area, &mut ls);
 }
 
-fn draw_detail(f: &mut Frame, area: Rect, data: &DashboardData) {
-    use crate::time::project_total_in;
+fn draw_right_column(f: &mut Frame, area: Rect, data: &DashboardData) {
     let Some(p) = data.projects.get(data.state.selected) else {
         return;
     };
+    let lines = detail_lines(p, data);
+    let detail_height = lines.len() as u16 + 2;
+    if area.height.saturating_sub(detail_height) < super::graph::MIN_HEIGHT {
+        draw_detail(f, area, lines);
+        return;
+    }
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(detail_height), Constraint::Min(0)])
+        .split(area);
+    draw_detail(f, rows[0], lines);
+    super::graph::draw_graph(f, rows[1], p, data);
+}
+
+fn detail_lines(p: &Project, data: &DashboardData) -> Vec<Line<'static>> {
+    use crate::time::project_total_in;
     let today = data.now.date();
     let intervals = [
         ("Day  ", Interval::Day(today)),
@@ -339,6 +354,10 @@ fn draw_detail(f: &mut Frame, area: Rect, data: &DashboardData) {
         }
         lines.push(Line::from(spans));
     }
+    lines
+}
+
+fn draw_detail(f: &mut Frame, area: Rect, lines: Vec<Line<'static>>) {
     let par = Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title("Detail"));
     f.render_widget(par, area);
 }
@@ -1100,5 +1119,87 @@ mod tests {
         // Column inner_right-1 must be the last digit of "1:00" (= '0').
         let last = buf[(inner_right - 1, row_y)].symbol();
         assert_eq!(last, "0", "time should end at inner_right - 1");
+    }
+
+    fn buffer_rows(term: &Terminal<TestBackend>) -> Vec<String> {
+        let buf = term.backend().buffer();
+        (0..buf.area.height)
+            .map(|y| (0..buf.area.width).map(|x| buf[(x, y)].symbol()).collect())
+            .collect()
+    }
+
+    fn draw_week_with_one_session(width: u16, height: u16) -> Terminal<TestBackend> {
+        let mut term = Terminal::new(TestBackend::new(width, height)).unwrap();
+        let projects = vec![Project {
+            name: ProjectName::parse("p").unwrap(),
+            sessions: vec![Session {
+                id: SessionId::generate(),
+                start: z(9),
+                stop: Some(z(10)),
+                note: None,
+            }],
+        }];
+        let names = vec![ProjectName::parse("p").unwrap()];
+        let mut state = AppState::new(date(2026, 5, 4), names);
+        state.interval = Interval::Week(date(2026, 5, 4));
+        let now = z(11);
+        let tz = TimeZone::UTC;
+        term.draw(|f| {
+            draw(
+                f,
+                &DashboardData {
+                    state: &state,
+                    projects: &projects,
+                    now: &now,
+                    tz: &tz,
+                },
+            )
+        })
+        .unwrap();
+        term
+    }
+
+    #[test]
+    fn graph_sits_directly_below_content_sized_detail() {
+        let term = draw_week_with_one_session(120, 30);
+        let rows = buffer_rows(&term);
+        let detail_y = rows
+            .iter()
+            .position(|r| r.contains("Detail"))
+            .expect("Detail title");
+        let graph_y = rows
+            .iter()
+            .position(|r| r.contains("Week · total 1:00 · peak 1:00 Mon"))
+            .unwrap_or_else(|| panic!("graph title missing: {rows:#?}"));
+        // Detail: name, blank, 4 interval rows, blank, "Recent sessions", 1 session = 9 lines + 2 borders.
+        assert_eq!(graph_y, detail_y + 11, "{rows:#?}");
+        assert!(
+            rows.iter()
+                .any(|r| r.contains(&format!("Mo{}Tu", " ".repeat(8)))),
+            "weekday label row missing: {rows:#?}"
+        );
+    }
+
+    #[test]
+    fn graph_hidden_when_right_column_too_short() {
+        // Body = 16 - 5 = 11 rows, exactly the Detail height: 0 rows left for the graph.
+        let term = draw_week_with_one_session(120, 16);
+        let text = buffer_rows(&term).join("\n");
+        assert!(!text.contains("· total"), "graph should be hidden: {text}");
+        assert!(
+            text.contains("Recent sessions"),
+            "Detail must still render: {text}"
+        );
+    }
+
+    #[test]
+    fn graph_shown_when_exactly_min_height_remains() {
+        // Body = 22 - 5 = 17 rows; Detail takes 11, leaving exactly MIN_HEIGHT (6).
+        let term = draw_week_with_one_session(120, 22);
+        let text = buffer_rows(&term).join("\n");
+        assert!(
+            text.contains("Week · total 1:00"),
+            "graph should render: {text}"
+        );
     }
 }
