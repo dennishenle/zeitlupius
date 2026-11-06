@@ -111,14 +111,18 @@ pub fn draw(f: &mut Frame, data: &DashboardData) {
     }
 }
 
-fn draw_header(f: &mut Frame, area: Rect, data: &DashboardData) {
-    let kind = match data.state.interval {
+pub(super) fn interval_kind(interval: &Interval) -> &'static str {
+    match interval {
         Interval::Day(_) => "Day",
         Interval::Week(_) => "Week",
         Interval::Month(_) => "Month",
         Interval::Year(_) => "Year",
         Interval::Custom { .. } => "Custom",
-    };
+    }
+}
+
+fn draw_header(f: &mut Frame, area: Rect, data: &DashboardData) {
+    let kind = interval_kind(&data.state.interval);
     let label = data.state.interval.label();
     let txt = format!("zeitlupius · {kind} · {label}");
     let p = Paragraph::new(Line::from(Span::styled(

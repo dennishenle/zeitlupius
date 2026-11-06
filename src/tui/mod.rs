@@ -1,4 +1,5 @@
 pub mod app;
+pub mod graph;
 pub mod input;
 pub mod modals;
 pub mod view;
