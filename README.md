@@ -34,9 +34,9 @@ add, edit, or clear the note on any existing session afterwards.
     zeitlupius session set-note rust-zlp <id>               # clear the note
 
 In the TUI, focus the Sessions panel (`Tab`), select a session, and press `e` to
-edit its note. Notes appear inline in the Sessions and Detail panels.
+edit its note. Notes appear inline in the Sessions and Overview panels.
 
-Below the Detail panel, a bar graph shows the selected project's tracked time
+Below the Overview panel, a bar graph shows the selected project's tracked time
 across the current interval: hours for a day, days for a week or month, and
 months for a year. It follows interval switching and paging, and hides itself
 when the terminal is too short.

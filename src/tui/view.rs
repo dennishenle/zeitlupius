@@ -358,7 +358,7 @@ fn detail_lines(p: &Project, data: &DashboardData) -> Vec<Line<'static>> {
 }
 
 fn draw_detail(f: &mut Frame, area: Rect, lines: Vec<Line<'static>>) {
-    let par = Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title("Detail"));
+    let par = Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title("Overview"));
     f.render_widget(par, area);
 }
 
@@ -1160,18 +1160,18 @@ mod tests {
     }
 
     #[test]
-    fn graph_sits_directly_below_content_sized_detail() {
+    fn graph_sits_directly_below_content_sized_overview() {
         let term = draw_week_with_one_session(120, 30);
         let rows = buffer_rows(&term);
         let detail_y = rows
             .iter()
-            .position(|r| r.contains("Detail"))
-            .expect("Detail title");
+            .position(|r| r.contains("Overview"))
+            .expect("Overview title");
         let graph_y = rows
             .iter()
             .position(|r| r.contains("Week · total 1:00 · peak 1:00 Mon"))
             .unwrap_or_else(|| panic!("graph title missing: {rows:#?}"));
-        // Detail: name, blank, 4 interval rows, blank, "Recent sessions", 1 session = 9 lines + 2 borders.
+        // Overview: name, blank, 4 interval rows, blank, "Recent sessions", 1 session = 9 lines + 2 borders.
         assert_eq!(graph_y, detail_y + 11, "{rows:#?}");
         assert!(
             rows.iter()
@@ -1182,13 +1182,13 @@ mod tests {
 
     #[test]
     fn graph_hidden_when_right_column_too_short() {
-        // Body = 16 - 5 = 11 rows, exactly the Detail height: 0 rows left for the graph.
+        // Body = 16 - 5 = 11 rows, exactly the Overview height: 0 rows left for the graph.
         let term = draw_week_with_one_session(120, 16);
         let text = buffer_rows(&term).join("\n");
         assert!(!text.contains("· total"), "graph should be hidden: {text}");
         assert!(
             text.contains("Recent sessions"),
-            "Detail must still render: {text}"
+            "Overview must still render: {text}"
         );
     }
 
