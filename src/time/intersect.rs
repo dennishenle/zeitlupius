@@ -6,14 +6,24 @@ pub fn session_overlap_seconds(
     now: &jiff::Zoned,
     tz: &jiff::tz::TimeZone,
 ) -> i64 {
+    let (lo, hi) = interval.bounds(tz);
+    overlap_seconds_between(session, &lo, &hi, now)
+}
+
+/// Seconds of `session` inside the half-open range `[lo, hi)`. Open sessions end at `now`.
+pub fn overlap_seconds_between(
+    session: &Session,
+    lo: &jiff::Zoned,
+    hi: &jiff::Zoned,
+    now: &jiff::Zoned,
+) -> i64 {
     let s = &session.start;
     let e = session.stop.as_ref().unwrap_or(now);
     if e <= s {
         return 0;
     }
-    let (lo, hi) = interval.bounds(tz);
-    let start = if s > lo { s.clone() } else { lo };
-    let end = if e < hi { e.clone() } else { hi };
+    let start = if s > lo { s } else { lo };
+    let end = if e < hi { e } else { hi };
     if end <= start {
         return 0;
     }
@@ -123,5 +133,29 @@ mod tests {
             .unwrap();
         assert_eq!(session_overlap_seconds(&s, &i, &now, &tz), 25 * 3600);
         assert!(ProjectName::parse("a").is_ok());
+    }
+
+    #[test]
+    fn overlap_between_clips_to_range() {
+        let s = closed(z(2026, 5, 4, 9, 30), z(2026, 5, 4, 11, 0));
+        let now = z(2026, 5, 4, 23, 0);
+        assert_eq!(
+            overlap_seconds_between(&s, &z(2026, 5, 4, 10, 0), &z(2026, 5, 4, 11, 0), &now),
+            3600,
+        );
+        assert_eq!(
+            overlap_seconds_between(&s, &z(2026, 5, 4, 9, 0), &z(2026, 5, 4, 10, 0), &now),
+            1800,
+        );
+    }
+
+    #[test]
+    fn overlap_between_empty_range_is_zero() {
+        let s = closed(z(2026, 5, 4, 9, 0), z(2026, 5, 4, 11, 0));
+        let edge = z(2026, 5, 4, 10, 0);
+        assert_eq!(
+            overlap_seconds_between(&s, &edge, &edge, &z(2026, 5, 4, 23, 0)),
+            0,
+        );
     }
 }
