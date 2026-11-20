@@ -2,6 +2,9 @@
 name = "zeitlupius"
 version = "0.1.0"
 edition = "2024"
+description = "Terminal time tracker - Ratatui TUI plus a feature-equivalent CLI"
+license = "MIT"
+repository = "https://github.com/dennishenle/zeitlupius"
 
 [dependencies]
 anyhow = "1.0.102"
