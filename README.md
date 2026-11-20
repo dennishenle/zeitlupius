@@ -6,6 +6,10 @@ Terminal time tracking — a Ratatui TUI plus a feature-equivalent CLI. Each pro
 
 ## Install
 
+    cargo install zeitlupius
+
+From a local checkout:
+
     cargo install --path .
 
 ## Usage
